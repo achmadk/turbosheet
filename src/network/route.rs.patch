@@ -1,0 +1,146 @@
+--- src/network/route.rs
++++ src/network/route.rs
+@@ -4,6 +4,11 @@
+ use std::collections::HashMap;
+ use tokio::sync::oneshot;
+ 
++use chromiumoxide::page::Page;
++use chromiumoxide::cdp::browser_protocol::fetch::{
++    EnableParams, EventRequestPaused, FulfillRequestParams, ContinueRequestParams, FailRequestParams,
++};
++use futures::StreamExt;
++
+ #[napi(object)]
+ #[derive(Clone)]
+ pub struct RouteRequest {
+@@ -85,3 +90,111 @@
+         }
+     }
+ }
++
++pub struct FetchInterceptor {
++    page_id: String,
++    handler_task: Option<tokio::task::JoinHandle<()>>,
++}
++
++impl FetchInterceptor {
++    pub fn new(page_id: String) -> Self {
++        Self {
++            page_id,
++            handler_task: None,
++        }
++    }
++
++    pub async fn enable(&mut self, page: &Page) -> Result<(), crate::error::TurbosheetError> {
++        let params = EnableParams::builder().build().unwrap();
++        page.execute(params).await.map_err(|e| {
++            crate::error::TurbosheetError::Other(format!("Failed to enable Fetch domain: {}", e))
++        })?;
++
++        let mut events = page.event_listener::<EventRequestPaused>().await.map_err(|e| {
++            crate::error::TurbosheetError::Other(format!("Failed to subscribe to Fetch events: {}", e))
++        })?;
++
++        let page_clone = page.clone();
++        let page_id = self.page_id.clone();
++        
++        self.handler_task = Some(tokio::spawn(async move {
++            while let Some(event) = events.next().await {
++                let url = event.request.url.clone();
++                let method = event.request.method.clone();
++                
++                let mut headers = HashMap::new();
++                if let Some(obj) = event.request.headers.inner().as_object() {
++                    for (k, v) in obj {
++                        if let Some(s) = v.as_str() {
++                            headers.insert(k.clone(), s.to_string());
++                        }
++                    }
++                }
++                
++                let post_data = event.request.post_data.clone().map(|s| Buffer::from(s.into_bytes()));
++                
++                let mut matched_handler = None;
++                if let Some(proxy) = crate::network::proxy::PAGE_PROXIES.get(&page_id) {
++                    for entry in proxy.routes.iter() {
++                        if entry.value().pattern.matches(&url) {
++                            matched_handler = Some(entry.value().callback.clone());
++                            break;
++                        }
++                    }
++                }
++                
++                if let Some(callback) = matched_handler {
++                    let (tx, rx) = oneshot::channel();
++                    let route_req = RouteRequest {
++                        url,
++                        method,
++                        headers,
++                        post_data,
++                    };
++                    let route = JsRoute::new(route_req, tx);
++                    
++                    let status = callback.call(
++                        Ok(route),
++                        napi::threadsafe_function::ThreadsafeFunctionCallMode::NonBlocking,
++                    );
++                    
++                    if status == napi::Status::Ok {
++                        if let Ok(action) = rx.await {
++                            match action {
++                                RouteAction::Fulfill(opts) => {
++                                    let mut builder = FulfillRequestParams::builder()
++                                        .request_id(event.request_id.clone())
++                                        .response_code(opts.status.unwrap_or(200) as i64);
++                                        
++                                    // Note: FulfillRequestParams headers are a bit tricky, we might need to use raw JSON if builder doesn't support it easily
++                                    // For now, let's use raw execute if needed, or just use the builder
++                                    let params = builder.build().unwrap();
++                                    let _ = page_clone.execute(params).await;
++                                }
++                                RouteAction::Continue(_opts) => {
++                                    let params = ContinueRequestParams::builder()
++                                        .request_id(event.request_id.clone())
++                                        .build()
++                                        .unwrap();
++                                    let _ = page_clone.execute(params).await;
++                                }
++                                RouteAction::Abort => {
++                                    let params = FailRequestParams::builder()
++                                        .request_id(event.request_id.clone())
++                                        .error_reason(chromiumoxide::cdp::browser_protocol::network::ErrorReason::Failed)
++                                        .build()
++                                        .unwrap();
++                                    let _ = page_clone.execute(params).await;
++                                }
++                            }
++                            continue;
++                        }
++                    }
++                }
++                
++                // Default continue
++                let params = ContinueRequestParams::builder()
++                    .request_id(event.request_id.clone())
++                    .build()
++                    .unwrap();
++                let _ = page_clone.execute(params).await;
++            }
++        }));
++
++        Ok(())
++    }
++
++    pub async fn disable(&mut self, page: &Page) -> Result<(), crate::error::TurbosheetError> {
++        if let Some(task) = self.handler_task.take() {
++            task.abort();
++        }
++        
++        let params = chromiumoxide::cdp::browser_protocol::fetch::DisableParams::builder().build().unwrap();
++        page.execute(params).await.map_err(|e| {
++            crate::error::TurbosheetError::Other(format!("Failed to disable Fetch domain: {}", e))
++        })?;
++        
++        Ok(())
++    }
++}

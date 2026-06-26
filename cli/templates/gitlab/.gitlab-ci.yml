@@ -1,0 +1,58 @@
+stages:
+  - test
+
+variables:
+  TURBOSHEET_CACHE_DIR: ~/.cache/turbosheet
+
+cache:
+  key: browsers-$CI_COMMIT_REF_SLUG
+  paths:
+    - ~/.cache/turbosheet
+
+.install_browsers:
+  before_script:
+    - npm ci
+    - npx tsheet install || true
+
+test:chromium:
+  stage: test
+  image: tsheet/tsheet:chromium-only
+  extends: .install_browsers
+  parallel:
+    matrix:
+      - SHARD: [1/4, 2/4, 3/4, 4/4]
+  script:
+    - npx tsheet test --browser=chromium --shard=$SHARD --reporter=junit > junit.xml
+  artifacts:
+    when: always
+    reports:
+      include_in_app: false
+      junit: junit.xml
+    paths:
+      - test-results/
+
+test:firefox:
+  stage: test
+  image: tsheet/tsheet
+  extends: .install_browsers
+  script:
+    - npx tsheet test --browser=firefox --shard=$SHARD --reporter=junit > junit.xml
+  artifacts:
+    when: always
+    reports:
+      junit: junit.xml
+    paths:
+      - test-results/
+
+test:webkit:
+  stage: test
+  image: tsheet/tsheet
+  extends: .install_browsers
+  script:
+    - npx tsheet test --browser=webkit --shard=$SHARD --reporter=junit > junit.xml
+  artifacts:
+    when: always
+    reports:
+      junit: junit.xml
+    paths:
+      - test-results/

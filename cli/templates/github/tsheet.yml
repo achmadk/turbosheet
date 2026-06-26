@@ -1,0 +1,47 @@
+name: TurboSheet Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Cache browser binaries
+        uses: actions/cache@v4
+        id: browser-cache
+        with:
+          path: ~/.cache/turbosheet
+          key: browsers-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            browsers-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install browsers
+        run: npx tsheet install
+        env:
+          TURBOSHEET_CACHE_DIR: ~/.cache/turbosheet
+
+      - name: Run tests (shard ${{ matrix.shard }}/4)
+        run: npx tsheet test --shard=${{ matrix.shard }}/4 --reporter={{reporter}}
+        env:
+          TURBOSHEET_CACHE_DIR: ~/.cache/turbosheet

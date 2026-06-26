@@ -1,0 +1,834 @@
+<!doctype html>
+<!-- Last validated against: src/lib.rs, index.js, index.d.ts -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TurboSheet — Rust-Powered Browser Automation</title>
+    <meta
+      name="description"
+      content="TurboSheet: High-performance Rust browser automation for Node.js. Built-in test runner, component testing, trace viewer, visual regression, and network interception."
+    />
+    <style>
+      /* =========================================================
+     TurboSheet Landing Page — Design System
+     Background: #06060f  |  Accent: oklch(0.75 0.18 200)
+     ========================================================= */
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg-deep: #06060f;
+        --bg-surface: rgba(255, 255, 255, 0.03);
+        --bg-elevated: rgba(255, 255, 255, 0.06);
+        --border: rgba(255, 255, 255, 0.07);
+        --accent: oklch(0.75 0.18 200);
+        --accent-glow: oklch(0.75 0.18 200 / 0.3);
+        --accent-warm: oklch(0.7 0.14 55);
+        --text-primary: #e8e8f0;
+        --text-secondary: #8888a0;
+        --text-muted: #55556a;
+        --font-display: ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", monospace;
+        --font-body:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        --max-width: 1120px;
+        --section-py: clamp(5rem, 12vw, 8rem);
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        font-family: var(--font-body);
+        background: var(--bg-deep);
+        color: var(--text-primary);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+      }
+
+      /* ---- Utility ---- */
+      .container {
+        max-width: var(--max-width);
+        margin-inline: auto;
+        padding-inline: 1.5rem;
+      }
+
+      /* ---- Typography ---- */
+      h1,
+      h2,
+      h3 {
+        font-family: var(--font-display);
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        line-height: 1.15;
+      }
+      h1 {
+        font-size: clamp(2.4rem, 6vw, 4.2rem);
+        letter-spacing: 0.06em;
+      }
+      h2 {
+        font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+        letter-spacing: 0.08em;
+        margin-bottom: 0.4em;
+      }
+      h3 {
+        font-size: clamp(1.05rem, 1.8vw, 1.2rem);
+        letter-spacing: 0.06em;
+      }
+      p {
+        color: var(--text-secondary);
+        font-size: 1.05rem;
+      }
+      .label-sm {
+        font-family: var(--font-display);
+        font-size: 0.72rem;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin-bottom: 0.75rem;
+      }
+
+      /* ---- Navigation ---- */
+      nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        padding: 1.2rem 0;
+        transition:
+          background 0.3s,
+          backdrop-filter 0.3s;
+      }
+      nav.scrolled {
+        background: rgba(6, 6, 15, 0.85);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+      }
+      nav .container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .nav-logo {
+        font-family: var(--font-display);
+        font-size: 1.1rem;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        color: var(--text-primary);
+        text-decoration: none;
+      }
+      .nav-logo em {
+        font-style: normal;
+        color: var(--accent);
+      }
+      .nav-links {
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+        list-style: none;
+      }
+      .nav-links a {
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-size: 0.875rem;
+        font-weight: 450;
+        transition: color 0.2s;
+      }
+      .nav-links a:hover {
+        color: var(--text-primary);
+      }
+      .nav-cta {
+        display: inline-flex;
+        padding: 0.5rem 1.25rem;
+        border-radius: 6px;
+        background: var(--accent);
+        color: #06060f !important;
+        font-weight: 550;
+        font-size: 0.8rem;
+        letter-spacing: 0.04em;
+        transition:
+          box-shadow 0.25s,
+          transform 0.2s;
+      }
+      .nav-cta:hover {
+        box-shadow: 0 0 24px var(--accent-glow);
+        transform: translateY(-1px);
+      }
+
+      /* ---- Hero ---- */
+      .hero {
+        position: relative;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        overflow: hidden;
+        padding-top: 5rem;
+      }
+      /* Grid background */
+      .hero-grid {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+        background-size: 52px 52px;
+        mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 70%);
+        -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 70%);
+      }
+      /* Floating particles (CSS only) */
+      .particles {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+      .particle {
+        position: absolute;
+        width: 2px;
+        height: 2px;
+        border-radius: 50%;
+        background: var(--accent);
+        opacity: 0;
+        animation: particleFloat linear infinite;
+      }
+      @keyframes particleFloat {
+        0% {
+          transform: translateY(100vh) scale(0);
+          opacity: 0;
+        }
+        10% {
+          opacity: 0.6;
+        }
+        90% {
+          opacity: 0.4;
+        }
+        100% {
+          transform: translateY(-10vh) scale(1);
+          opacity: 0;
+        }
+      }
+      /* Hero gradient orbs */
+      .hero-orb {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(100px);
+        pointer-events: none;
+        z-index: 0;
+      }
+      .hero-orb--cyan {
+        width: 500px;
+        height: 500px;
+        background: oklch(0.75 0.18 200 / 0.08);
+        top: -20%;
+        left: -10%;
+        animation: orbFloat 20s ease-in-out infinite;
+      }
+      .hero-orb--warm {
+        width: 400px;
+        height: 400px;
+        background: oklch(0.7 0.14 55 / 0.05);
+        bottom: -15%;
+        right: -10%;
+        animation: orbFloat 25s ease-in-out infinite reverse;
+      }
+      @keyframes orbFloat {
+        0%,
+        100% {
+          transform: translate(0, 0) scale(1);
+        }
+        33% {
+          transform: translate(40px, -60px) scale(1.1);
+        }
+        66% {
+          transform: translate(-30px, 30px) scale(0.9);
+        }
+      }
+
+      .hero-content {
+        position: relative;
+        z-index: 1;
+        max-width: 780px;
+      }
+      .hero .label-sm {
+        margin-bottom: 1.2rem;
+      }
+      .hero h1 {
+        margin-bottom: 0.5em;
+      }
+      .hero h1 .accent {
+        color: var(--accent);
+      }
+      .hero p {
+        font-size: clamp(1.05rem, 1.8vw, 1.15rem);
+        max-width: 580px;
+        margin-bottom: 2.5rem;
+      }
+      .hero-actions {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.8rem 1.8rem;
+        border-radius: 8px;
+        font-family: var(--font-display);
+        font-size: 0.85rem;
+        font-weight: 500;
+        letter-spacing: 0.06em;
+        text-decoration: none;
+        transition: all 0.25s;
+        cursor: pointer;
+        border: none;
+      }
+      .btn--primary {
+        background: var(--accent);
+        color: #06060f;
+        box-shadow: 0 0 0 transparent;
+      }
+      .btn--primary:hover {
+        box-shadow: 0 0 32px var(--accent-glow);
+        transform: translateY(-2px);
+      }
+      .btn--secondary {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1px solid var(--border);
+      }
+      .btn--secondary:hover {
+        border-color: rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .hero-stats {
+        display: flex;
+        gap: 2.5rem;
+        margin-top: 3.5rem;
+        padding-top: 2rem;
+        border-top: 1px solid var(--border);
+      }
+      .hero-stat h3 {
+        font-size: 1rem;
+        color: var(--accent);
+        font-family: var(--font-display);
+        letter-spacing: 0.06em;
+      }
+      .hero-stat p {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        margin-top: 0.2rem;
+      }
+
+      /* ---- Section common ---- */
+      section {
+        padding: var(--section-py) 0;
+      }
+      .section-label {
+        text-align: center;
+      }
+
+      /* ---- Features ---- */
+      .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.5rem;
+        margin-top: 2.5rem;
+      }
+      .feature-card {
+        padding: 2rem;
+        border-radius: 12px;
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        transition:
+          border-color 0.25s,
+          transform 0.25s;
+      }
+      .feature-card:hover {
+        border-color: rgba(255, 255, 255, 0.12);
+        transform: translateY(-3px);
+      }
+      .feature-card .icon {
+        width: 2.5rem;
+        height: 2.5rem;
+        margin-bottom: 1.25rem;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-display);
+        font-size: 1rem;
+        color: var(--accent);
+        background: oklch(0.75 0.18 200 / 0.1);
+      }
+      .feature-card h3 {
+        margin-bottom: 0.6rem;
+      }
+      .feature-card p {
+        font-size: 0.92rem;
+        line-height: 1.6;
+      }
+
+      /* ---- Architecture / Performance ---- */
+      .arch {
+        background: radial-gradient(
+          ellipse 60% 80% at 50% 30%,
+          oklch(0.75 0.18 200 / 0.04),
+          transparent
+        );
+        text-align: center;
+      }
+      .arch-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 2rem;
+        margin-top: 3rem;
+      }
+      .arch-item {
+        padding: 2.5rem 1.5rem;
+        border-radius: 12px;
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        text-align: left;
+      }
+      .arch-item .icon {
+        font-family: var(--font-display);
+        font-size: 0.85rem;
+        color: var(--accent);
+        margin-bottom: 0.75rem;
+        letter-spacing: 0.1em;
+      }
+      .arch-item h3 {
+        margin-bottom: 0.6rem;
+        font-size: 0.95rem;
+      }
+      .arch-item p {
+        font-size: 0.85rem;
+        line-height: 1.6;
+      }
+
+      /* ---- Code Example ---- */
+      .code-section {
+        text-align: center;
+      }
+      .code-block {
+        margin-top: 2.5rem;
+        text-align: left;
+        border-radius: 12px;
+        background: #0c0c18;
+        border: 1px solid var(--border);
+        overflow: hidden;
+        position: relative;
+      }
+      .code-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.25rem;
+        border-bottom: 1px solid var(--border);
+        font-family: var(--font-display);
+        font-size: 0.75rem;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+      }
+      .code-header .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
+      .code-header .dot:nth-child(1) {
+        background: #ff5f56;
+      }
+      .code-header .dot:nth-child(2) {
+        background: #ffbd2e;
+      }
+      .code-header .dot:nth-child(3) {
+        background: #27c93f;
+      }
+      .code-body {
+        padding: 1.5rem 1.75rem;
+        overflow-x: auto;
+        font-family: var(--font-display);
+        font-size: 0.82rem;
+        line-height: 1.6;
+        color: #c0c0d0;
+      }
+      .code-body .kw {
+        color: oklch(0.7 0.15 280);
+      } /* keyword */
+      .code-body .str {
+        color: oklch(0.7 0.14 145);
+      } /* string */
+      .code-body .fn {
+        color: oklch(0.75 0.18 200);
+      } /* function */
+      .code-body .cmt {
+        color: #55556a;
+      } /* comment */
+      .code-body .num {
+        color: oklch(0.75 0.14 30);
+      } /* number */
+      .code-body .prop {
+        color: oklch(0.65 0.1 250);
+      } /* property */
+
+      /* ---- Footer ---- */
+      footer {
+        padding: 3rem 0;
+        border-top: 1px solid var(--border);
+        text-align: center;
+      }
+      footer p {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+      }
+      footer a {
+        color: var(--text-secondary);
+        text-decoration: none;
+        transition: color 0.2s;
+      }
+      footer a:hover {
+        color: var(--text-primary);
+      }
+
+      /* ---- Responsive ---- */
+      @media (max-width: 640px) {
+        .nav-links {
+          gap: 1rem;
+        }
+        .nav-links a:not(.nav-cta) {
+          display: none;
+        }
+        .hero-stats {
+          flex-direction: column;
+          gap: 1rem;
+        }
+        .features-grid {
+          grid-template-columns: 1fr;
+        }
+        .arch-grid {
+          grid-template-columns: 1fr;
+        }
+        .code-body {
+          font-size: 0.72rem;
+          padding: 1rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ==================== NAV ==================== -->
+    <nav id="navbar">
+      <div class="container">
+        <a href="#" class="nav-logo">Turbo<em>Sheet</em></a>
+        <ul class="nav-links">
+          <li><a href="#features">Features</a></li>
+          <li><a href="#architecture">Architecture</a></li>
+          <li><a href="#code">API</a></li>
+          <li>
+            <a href="https://github.com/achmadk/turbosheet" target="_blank" class="nav-cta"
+              >GitHub →</a
+            >
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- ==================== HERO ==================== -->
+    <section class="hero" id="hero">
+      <!-- Background -->
+      <div class="hero-grid"></div>
+      <div class="particles" id="particles"></div>
+      <div class="hero-orb hero-orb--cyan"></div>
+      <div class="hero-orb hero-orb--warm"></div>
+
+      <div class="container hero-content">
+        <p class="label-sm">v0.1.0 · Rust + N-API</p>
+        <h1>
+          Browser automation<br />
+          <span class="accent">at Rust speed.</span>
+        </h1>
+        <p>
+          TurboSheet is a high-performance browser automation framework for Node.js, built in Rust
+          via napi-rs. Native test runner, component testing, trace viewer, visual regression, and
+          network interception — all running directly against the browser protocol with zero JSON
+          serialization overhead.
+        </p>
+        <div class="hero-actions">
+          <a href="#" class="btn btn--primary">Get Started →</a>
+          <a href="#code" class="btn btn--secondary">View API</a>
+        </div>
+
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <h3>Rust Core</h3>
+            <p>napi-rs native bindings — no JSON-RPC bridge</p>
+          </div>
+          <div class="hero-stat">
+            <h3>Test Runner</h3>
+            <p>Built-in describe/test/expect with Rust-native execution</p>
+          </div>
+          <div class="hero-stat">
+            <h3>Component Tests</h3>
+            <p>Mount React, Vue, or Svelte with locator API</p>
+          </div>
+          <div class="hero-stat">
+            <h3>6 Platforms</h3>
+            <p>Prebuilt binaries for Linux, macOS, Windows · ARM + x64</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== FEATURES ==================== -->
+    <section id="features">
+      <div class="container">
+        <p class="label-sm section-label">Features</p>
+        <h2 style="text-align: center">Everything you need<br />for browser automation.</h2>
+
+        <div class="features-grid">
+          <div class="feature-card">
+            <div class="icon">⚡</div>
+            <h3>Rust-Powered Core</h3>
+            <p>
+              Every browser interaction runs through Rust via napi-rs. Zero-GC overhead, direct CDP
+              protocol access via chromiumoxide, and native thread-level parallelism out of the box.
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="icon">▷</div>
+            <h3>Built-in Test Runner</h3>
+            <p>
+              Describe, test, and expect — all native Rust functions. Multi-reporter output (dot,
+              list, html, json, junit, github), sharding, retries, timeouts, and parallel workers.
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="icon">◎</div>
+            <h3>Component Testing</h3>
+            <p>
+              Mount React, Vue, or Svelte components directly with <code>mount()</code>. Interact
+              via locator API, get props and state, wait for conditions — all without a separate
+              test framework.
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="icon">◉</div>
+            <h3>Locator API</h3>
+            <p>
+              Role, text, label, placeholder, alt text, title, and test ID selectors. Chainable
+              filter, first, last, nth. Actions: click, fill, hover, focus, check, select,
+              double-click — matching Playwright's ergonomics.
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="icon">⊞</div>
+            <h3>Trace Viewer</h3>
+            <p>
+              Record all interactions during test execution. Serialize and deserialize traces,
+              generate an interactive HTML viewer, and export events as JSON for custom analysis.
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="icon">⊕</div>
+            <h3>Visual Regression</h3>
+            <p>
+              Pixel-level screenshot comparison with configurable thresholds. Generate diff images,
+              save snapshots, and integrate with the test runner for automatic pass/fail判定.
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="icon">◈</div>
+            <h3>Video Recording</h3>
+            <p>
+              Record browser sessions with configurable FPS, quality, codec (VP8, VP9, H264, H265),
+              and retention policy (always, on-failure, never). Per-page or per-context.
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="icon">↗</div>
+            <h3>Network Interception</h3>
+            <p>
+              Route, modify, and mock network requests with <code>page.route()</code>. Inspect
+              request/response headers, bodies, and status codes — ideal for testing edge cases and
+              offline scenarios.
+            </p>
+          </div>
+          <div class="feature-card">
+            <div class="icon">⎇</div>
+            <h3>Swarm &amp; CLI</h3>
+            <p>
+              Redis-backed parallel execution across machines with <code>--swarm</code>. CLI
+              includes test runner, codegen, debug mode, migration from Playwright/Cypress, and CI
+              initialization.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== ARCHITECTURE ==================== -->
+    <section class="arch" id="architecture">
+      <div class="container">
+        <p class="label-sm section-label">Architecture</p>
+        <h2 style="text-align: center">Built for performance,<br />not hype.</h2>
+
+        <div class="arch-grid">
+          <div class="arch-item">
+            <div class="icon">// napi-rs</div>
+            <h3>Zero-Copy FFI</h3>
+            <p>
+              No JSON-RPC bridge between Node.js and the browser driver. Rust communicates directly
+              via napi-rs buffers and function calls — eliminating serialization overhead entirely.
+            </p>
+          </div>
+          <div class="arch-item">
+            <div class="icon">// chromiumoxide</div>
+            <h3>Direct CDP Protocol</h3>
+            <p>
+              Uses the <code>chromiumoxide</code> Rust library for native Chrome DevTools Protocol
+              handling. No subprocess orchestration, no HTTP translation layer — just direct
+              WebSocket commands.
+            </p>
+          </div>
+          <div class="arch-item">
+            <div class="icon">// engines</div>
+            <h3>Feature-Flagged Engines</h3>
+            <p>
+              Chromium is the default and most mature engine. Firefox (WebDriver BiDi) is
+              configurable via the <code>bidi</code> feature flag. WebKit support is under active
+              development behind the <code>webkit</code> feature flag.
+            </p>
+          </div>
+          <div class="arch-item">
+            <div class="icon">// wasm</div>
+            <h3>Edge &amp; WASM Targets</h3>
+            <p>
+              Experimental compilation target for <code>wasm32-wasi</code> via the
+              <code>edge</code> feature, enabling browser automation from serverless, edge runtime,
+              and lightweight container environments.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== CODE EXAMPLE ==================== -->
+    <section id="code" class="code-section">
+      <div class="container">
+        <p class="label-sm section-label">Simple API</p>
+        <h2 style="text-align: center">Write less. Automate more.</h2>
+
+        <div class="code-block" style="max-width: 720px; margin-inline: auto">
+          <div class="code-header">
+            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            <span style="margin-left: auto">example.mjs</span>
+          </div>
+          <pre class="code-body"><code><span class="cmt">// Page automation with locator API</span>
+<span class="kw">import</span> { <span class="fn">launch</span>, <span class="fn">test</span>, <span class="fn">expect</span>, <span class="fn">mount</span> } <span class="kw">from</span> <span class="str">'turbo-sheet'</span>;
+
+<span class="kw">const</span> browser = <span class="kw">await</span> <span class="fn">launch</span>({ headless: <span class="kw">true</span> });
+<span class="kw">const</span> ctx     = <span class="kw">await</span> browser.<span class="fn">newContext</span>();
+<span class="kw">const</span> page    = <span class="kw">await</span> ctx.<span class="fn">newPage</span>();
+<span class="kw">await</span> page.<span class="fn">goto</span>(<span class="str">'https://example.com'</span>);
+
+<span class="kw">const</span> button = page.<span class="fn">locator</span>(<span class="str">'button#submit'</span>);
+<span class="kw">await</span> button.<span class="fn">click</span>();
+
+<span class="cmt">// Component testing</span>
+<span class="kw">const</span> component = <span class="kw">await</span> <span class="fn">mount</span>(<span class="str">'&lt;Counter /&gt;'</span>, { framework: <span class="str">'react'</span> });
+<span class="kw">await</span> component.<span class="fn">locator</span>(<span class="str">'button'</span>).<span class="fn">click</span>();
+<span class="kw">const</span> html = <span class="kw">await</span> component.<span class="prop">content</span>();
+
+<span class="cmt">// Built-in test runner</span>
+<span class="fn">test</span>(<span class="str">'homepage loads'</span>, <span class="kw">async</span> () => {
+  <span class="kw">await</span> page.<span class="fn">goto</span>(<span class="str">'https://example.com'</span>);
+  <span class="fn">expect</span>(<span class="kw">await</span> page.<span class="prop">title</span>()).<span class="fn">toBe</span>(<span class="str">'Example Domain'</span>);
+});</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== FOOTER ==================== -->
+    <footer>
+      <div class="container">
+        <p>
+          <a
+            href="#"
+            class="nav-logo"
+            style="font-size: 0.85rem; display: inline-block; margin-bottom: 1rem"
+          >
+            Turbo<em>Sheet</em>
+          </a>
+        </p>
+        <p>
+          Built with Rust &middot; MIT License &middot;
+          <a href="https://github.com/achmadk/turbosheet">GitHub</a> &middot;
+          <a href="https://github.com/achmadk/turbosheet#readme">Documentation</a> &middot;
+          <a href="https://github.com/achmadk/turbosheet/tree/dev/cli">CLI Reference</a>
+        </p>
+        <p style="margin-top: 0.5rem">&copy; 2026 TurboSheet Contributors</p>
+      </div>
+    </footer>
+
+    <!-- ==================== JAVASCRIPT ==================== -->
+    <script>
+      (function () {
+        "use strict";
+
+        // ----- Nav scroll -----
+        const nav = document.getElementById("navbar");
+        let ticking = false;
+        function onScroll() {
+          if (!ticking) {
+            requestAnimationFrame(() => {
+              nav.classList.toggle("scrolled", window.scrollY > 60);
+              ticking = false;
+            });
+            ticking = true;
+          }
+        }
+        window.addEventListener("scroll", onScroll, { passive: true });
+        if (window.scrollY > 60) nav.classList.add("scrolled");
+
+        // ----- Particles (CSS-driven floating dots) -----
+        const container = document.getElementById("particles");
+        const count = Math.min(24, Math.floor(window.innerWidth / 40));
+        for (let i = 0; i < count; i++) {
+          const el = document.createElement("div");
+          el.className = "particle";
+          el.style.left = Math.random() * 100 + "%";
+          el.style.width = 1 + Math.random() * 2 + "px";
+          el.style.height = el.style.width;
+          el.style.animationDuration = 12 + Math.random() * 18 + "s";
+          el.style.animationDelay = Math.random() * 12 + "s";
+          el.style.opacity = (0.2 + Math.random() * 0.4).toFixed(2);
+          container.appendChild(el);
+        }
+
+        // ----- Smooth anchor scroll -----
+        document.querySelectorAll('a[href^="#"]').forEach((a) => {
+          a.addEventListener("click", (e) => {
+            const id = a.getAttribute("href").slice(1);
+            if (!id) return;
+            const target = document.getElementById(id);
+            if (!target) return;
+            e.preventDefault();
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,152 @@
+{
+  "name": "tsheet",
+  "displayName": "TurboSheet",
+  "version": "0.1.0",
+  "description": "High-performance browser automation for Node.js - TurboSheet VS Code Extension",
+  "categories": [
+    "Debuggers",
+    "Testing"
+  ],
+  "publisher": "tsheet",
+  "main": "./out/extension.js",
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@types/vscode": "^1.75.0",
+    "typescript": "^6.0.3"
+  },
+  "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "id": "tsheet.testExplorer",
+          "name": "TurboSheet Tests",
+          "when": "tsheet:hasTests"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "tsheet.activitybar",
+          "title": "TurboSheet",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "tsheet.discoverTests",
+        "title": "Discover Tests",
+        "category": "TurboSheet"
+      },
+      {
+        "command": "tsheet.runTest",
+        "title": "Run Test",
+        "category": "TurboSheet"
+      },
+      {
+        "command": "tsheet.runAllTests",
+        "title": "Run All Tests",
+        "category": "TurboSheet"
+      },
+      {
+        "command": "tsheet.debugTest",
+        "title": "Debug Test",
+        "category": "TurboSheet"
+      },
+      {
+        "command": "tsheet.showTrace",
+        "title": "Show Trace",
+        "category": "TurboSheet"
+      },
+      {
+        "command": "tsheet.viewSettings",
+        "title": "TurboSheet Settings",
+        "category": "TurboSheet"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "TurboSheet",
+      "properties": {
+        "tsheet.browser": {
+          "type": "string",
+          "enum": [
+            "chromium",
+            "firefox",
+            "webkit"
+          ],
+          "default": "chromium",
+          "description": "Default browser for test execution"
+        },
+        "tsheet.headless": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run browser in headless mode"
+        },
+        "tsheet.timeout": {
+          "type": "number",
+          "default": 30000,
+          "description": "Default test timeout in milliseconds"
+        },
+        "tsheet.workers": {
+          "type": "number",
+          "default": 1,
+          "description": "Number of parallel workers"
+        },
+        "tsheet.reporter": {
+          "type": "string",
+          "enum": [
+            "dot",
+            "line",
+            "list",
+            "json",
+            "html",
+            "github"
+          ],
+          "default": "list",
+          "description": "Default test reporter"
+        },
+        "tsheet.traceViewerPort": {
+          "type": "number",
+          "default": 3000,
+          "description": "Port for trace viewer server"
+        }
+      }
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "tsheet.runTest",
+          "when": "editorTextFocus && editorLangId == typescript",
+          "group": "tsheet@1"
+        },
+        {
+          "command": "tsheet.debugTest",
+          "when": "editorTextFocus && editorLangId == typescript",
+          "group": "tsheet@2"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "tsheet.runAllTests",
+          "when": "view == tsheet.testExplorer",
+          "group": "navigation@1"
+        },
+        {
+          "command": "tsheet.discoverTests",
+          "when": "view == tsheet.testExplorer",
+          "group": "navigation@2"
+        }
+      ]
+    }
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  }
+}

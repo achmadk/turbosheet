@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Stealth Test</title>
+  </head>
+  <body>
+    <h1>Stealth Check</h1>
+    <div id="result">Testing...</div>
+    <script>
+      setTimeout(() => {
+        let isBot = false;
+        // Check common bot bindings
+        if (
+          window.__turbosheet ||
+          window.__turbosheet_binding ||
+          window._playwright ||
+          window.__puppeteer
+        ) {
+          isBot = true;
+        }
+
+        // Look for global variables starting with __ts
+        for (let key in window) {
+          if (key.startsWith("__ts")) {
+            // Random bindings might look like __ts_g_XYZ
+            // A real bot evasion script would look for specific known patterns
+            // but since ours are randomized UUIDs, they won't match known signatures.
+          }
+        }
+
+        document.getElementById("result").innerText = isBot ? "BOT DETECTED" : "CLEAN";
+      }, 500);
+    </script>
+  </body>
+</html>

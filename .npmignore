@@ -1,0 +1,11 @@
+__test__/
+src/
+target/
+build.rs
+Cargo.toml
+Cargo.lock
+tsconfig.json
+vitest.config.ts
+.github/
+*.md
+!.npmignore

@@ -1,0 +1,67 @@
+{
+  "name": "turbo-sheet",
+  "version": "0.1.0",
+  "description": "TurboSheet - High-performance Rust browser automation for Node.js. 3x faster than Playwright, 50% less memory.",
+  "keywords": [
+    "ai-agent",
+    "browser-automation",
+    "e2e-testing",
+    "napi-rs",
+    "playwright-alternative",
+    "rust",
+    "web-scraping"
+  ],
+  "license": "MIT",
+  "bin": {
+    "tsheet": "./cli/tsheet.js"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "cli/",
+    "*.node"
+  ],
+  "main": "index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "build": "vp run build:js && napi build --platform --release",
+    "build:js:backup": "vp dlx esbuild js/src/injected-core.ts --bundle --minify --outfile=js/dist/injected-core.min.js && vp dlx esbuild js/src/injected-actions.ts --bundle --minify --outfile=js/dist/injected-actions.min.js",
+    "build:js": "vp pack",
+    "build:debug": "vp run build:js && napi build --platform",
+    "build:wasm": "vp run build:js && cargo build --target wasm32-wasi --release",
+    "test": "vp test run",
+    "test:watch": "vp test",
+    "clean": "napi clean",
+    "prepublishOnly": "napi prepublish -t npm",
+    "format": "prettier --write '**/*.{ts,js,json,md}'",
+    "lint": "eslint '**/*.ts'",
+    "prepare": "vp config"
+  },
+  "dependencies": {
+    "@swc/core": "^1.15.41",
+    "isolated-vm": "^7.0.0"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.7.2",
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^25.9.3",
+    "cypress": "^15.18.0",
+    "playwright": "^1.61.1",
+    "typescript": "^6.0.3",
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
+  },
+  "napi": {
+    "binaryName": "turbosheet",
+    "targets": [
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-gnu",
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin",
+      "x86_64-pc-windows-msvc",
+      "aarch64-pc-windows-msvc"
+    ]
+  },
+  "packageManager": "pnpm@11.9.0"
+}
