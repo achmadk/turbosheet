@@ -65,7 +65,7 @@
 
 - [ ] 0.5.1.7 Fix `migrate_playwright_file()`: `page.$$eval` → `page.evaluate` is an oversimplification ($$eval returns array over all matches, evaluate has different signature) — add appropriate wrapper or comment
 - [ ] 0.5.1.8 Add missing API mappings to `migrate_playwright()`: `page.addInitScript()`, `page.addStyleTag()`, `page.addScriptTag()`, `page.pause()`
-- [ ] 0.5.1.9 Fix `migrate_playwright_file()`: `from 'playwright'` → `from 'turbo-sheet'` should be `from 'tsheet'` for consistency
+- [ ] 0.5.1.9 Fix `migrate_playwright_file()`: `from 'playwright'` → `from 'turbosheet'` should be `from 'tsheet'` for consistency
 
 ### 0.5.2 Stub API Completion — Eliminate Silent No-Ops
 

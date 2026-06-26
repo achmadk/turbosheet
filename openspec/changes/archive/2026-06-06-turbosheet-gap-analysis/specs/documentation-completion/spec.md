@@ -7,7 +7,7 @@ The project SHALL include a getting-started tutorial that enables a new user to 
 #### Scenario: Tutorial covers full happy path
 
 - **WHEN** a new user follows the getting-started tutorial
-- **THEN** they SHALL be able to: install via `npm install turbo-sheet`, launch a Chromium browser, navigate to a URL, interact with a page element, write and run a test with assertions, view test results
+- **THEN** they SHALL be able to: install via `npm install turbosheet`, launch a Chromium browser, navigate to a URL, interact with a page element, write and run a test with assertions, view test results
 
 ### Requirement: Comprehensive API reference
 
@@ -16,7 +16,7 @@ The documentation SHALL contain a complete API reference covering every public c
 #### Scenario: API reference covers all exports
 
 - **WHEN** a developer views the API reference
-- **THEN** every public API exported from 'turbo-sheet' SHALL have a documented entry with: signature, parameter descriptions, return type, example usage, and notes on browser compatibility
+- **THEN** every public API exported from 'turbosheet' SHALL have a documented entry with: signature, parameter descriptions, return type, example usage, and notes on browser compatibility
 
 #### Scenario: Configuration reference
 

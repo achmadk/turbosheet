@@ -10,7 +10,7 @@
 ## Step 1: Install TurboSheet
 
 ```bash
-npm install -D turbo-sheet
+npm install -D turbosheet
 ```
 
 ## Step 2: Install Browser
@@ -31,7 +31,7 @@ npx tsheet install webkit
 Create a file `tests/example.spec.ts`:
 
 ```typescript
-import { test, expect } from "turbo-sheet";
+import { test, expect } from "turbosheet";
 
 test("homepage loads correctly", async ({ page }) => {
   await page.goto("https://example.com");
@@ -53,7 +53,7 @@ test("navigation works", async ({ page }) => {
 Create `tsheet.config.ts` in your project root:
 
 ```typescript
-import { defineConfig } from "turbo-sheet";
+import { defineConfig } from "turbosheet";
 
 export default defineConfig({
   testDir: "./tests",
@@ -100,7 +100,7 @@ Create additional test files following the same pattern:
 
 ```typescript
 // tests/login.spec.ts
-import { test, expect } from "turbo-sheet";
+import { test, expect } from "turbosheet";
 
 test.describe("login flow", () => {
   test.beforeEach(async ({ page }) => {
@@ -284,4 +284,4 @@ npx tsheet devices
 npx tsheet --version
 ```
 
-Report issues at: https://github.com/turbo-sheet/turbo-sheet/issues
+Report issues at: https://github.com/turbosheet/turbosheet/issues

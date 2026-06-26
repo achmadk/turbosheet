@@ -26,7 +26,7 @@ The migration module SHALL have unit tests and integration tests verifying that 
 #### Scenario: Playwright import statement transformation
 
 - **WHEN** the migration tool processes a file with `import { test, expect } from '@playwright/test'`
-- **THEN** the output SHALL contain `import { test, expect } from 'turbo-sheet'`
+- **THEN** the output SHALL contain `import { test, expect } from 'turbosheet'`
 
 #### Scenario: Cypress chain unwrapping produces valid TS
 

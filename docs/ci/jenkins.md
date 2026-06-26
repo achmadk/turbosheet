@@ -263,7 +263,7 @@ def call(Map config = [:]) {
 Usage in Jenkinsfile:
 
 ```groovy
-@Library('turbo-sheet-library') _
+@Library('turbosheet-library') _
 
 turboSheet browser: 'chromium', reporter: 'list'
 ```

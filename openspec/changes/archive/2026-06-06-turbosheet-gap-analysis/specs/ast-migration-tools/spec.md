@@ -8,7 +8,7 @@ The `tsheet migrate from playwright` command SHALL parse Playwright test files u
 
 - **WHEN** `tsheet migrate from playwright tests/example.spec.ts` is executed
 - **THEN** the output SHALL be a valid TurboSheet test file with:
-  - `import { test, expect } from 'turbo-sheet'` replacing `import { test, expect } from '@playwright/test'`
+  - `import { test, expect } from 'turbosheet'` replacing `import { test, expect } from '@playwright/test'`
   - `page.goto()` calls preserved (same API)
   - `locator()` calls preserved (same API name)
   - `expect(locator).toBeVisible()` preserved (same API)

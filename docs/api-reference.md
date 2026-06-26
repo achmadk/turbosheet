@@ -23,7 +23,7 @@ Complete API documentation for TurboSheet.
 Defines the test configuration.
 
 ```typescript
-import { defineConfig } from "turbo-sheet";
+import { defineConfig } from "turbosheet";
 
 export default defineConfig({
   testDir: "./tests",
@@ -61,7 +61,7 @@ export default defineConfig({
 Defines a test case.
 
 ```typescript
-import { test, expect } from "turbo-sheet";
+import { test, expect } from "turbosheet";
 
 test("login works", async ({ page }) => {
   await page.goto("/login");
@@ -598,7 +598,7 @@ route.fulfill({
 ### Built-in Devices
 
 ```typescript
-import { devices } from "turbo-sheet";
+import { devices } from "turbosheet";
 
 test("works on iPhone", async ({ page }) => {
   await page.emulate(devices["iPhone 13"]);

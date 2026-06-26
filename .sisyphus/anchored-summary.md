@@ -20,7 +20,7 @@
 - Updated `tasks.md` 0.5.1 tasks (9 tasks) and 0.5.7 test tasks (3 tasks) with accurate descriptions
 - **puppeteer.rs fixes**: Added 9 missing API mappings, fixed `page.emulate()` automated flag (false), removed destructive global `width:`/`height:`/`type:` replacements that corrupted unrelated code
 - **cypress.rs fixes**: Fixed `cy.get(`/`cy.contains(` quote mismatch (preserves single/double/backtick quotes separately), fixed intercept callback pattern that produced broken syntax
-- **playwright.rs fixes**: Fixed `$$eval` oversimplification with semantic comment, fixed `from 'playwright'` → `from 'tsheet'` (was `'turbo-sheet'`), added 4 missing API mappings
+- **playwright.rs fixes**: Fixed `$$eval` oversimplification with semantic comment, fixed `from 'playwright'` → `from 'tsheet'` (was `'turbosheet'`), added 4 missing API mappings
 - **Tests**: Added 39 unit tests across all 3 adapters (12 puppeteer, 17 cypress, 10 playwright)
 
 ### In Progress

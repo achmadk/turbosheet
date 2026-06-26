@@ -198,7 +198,7 @@ mod tests {
         let input = "from 'playwright'".to_string();
         let result = migrate_playwright_file(input);
         assert!(result.contains("from 'tsheet'"));
-        assert!(!result.contains("from 'turbo-sheet'"));
+        assert!(!result.contains("from 'turbosheet'"));
     }
 
     #[test]

@@ -265,7 +265,7 @@ describe("0.4.7 Real Input Dispatch – Trusted Events & CSS Triggers", () => {
 
   // Helper: evaluate returns string values (CDP serializes as JSON)
   const eTrue = "true";
-  // Find the turbo-sheet global proxy by scanning for dispatch
+  // Find the turbosheet global proxy by scanning for dispatch
   const FIND_TS = `(() => { for (const k of Object.getOwnPropertyNames(window)) { try { const v = window[k]; if (v && typeof v.dispatch === 'function') return k; } catch(e) {} } return ''; })()`;
 
   it("should have isTrusted === true on CDP click (mousedown+mouseup)", async () => {

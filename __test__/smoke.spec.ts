@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vite-plus/test";
 
-describe("turbo-sheet smoke", () => {
+describe("turbosheet smoke", () => {
   it("should load the native module when built", async () => {
     let tsheet: Awaited<typeof import("../index.js")> | null = null;
     try {

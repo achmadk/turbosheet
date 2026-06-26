@@ -26,7 +26,7 @@ impl WorkerProcess {
             // When running from the package directory
             "src/runtime/worker-entry.ts",
             // When installed as a node module
-            "node_modules/turbo-sheet/src/runtime/worker-entry.ts",
+            "node_modules/turbosheet/src/runtime/worker-entry.ts",
         ];
 
         let base_dir = std::env::current_dir().unwrap_or_default();

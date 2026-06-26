@@ -6,7 +6,7 @@ The root `index.d.ts` SHALL provide complete, accurate, and documented type decl
 
 #### Scenario: All N-API exported functions have TypeScript declarations
 
-- **WHEN** a TypeScript project imports from 'turbo-sheet'
+- **WHEN** a TypeScript project imports from 'turbosheet'
 - **THEN** every exported function, class, interface, and type SHALL have a corresponding declaration in index.d.ts with accurate parameter types and return types
 
 #### Scenario: JsLocator has chainable method declarations

@@ -700,7 +700,7 @@ These gaps were discovered through deep codebase audit and are NOT listed in the
 | 1   | **No typed error hierarchy** — Single `TurbosheetError` enum; no `TimeoutError`, `LocatorError`, `AssertionError`, `NetworkError`                               | `src/error.rs`                                   | Poor DX, can't catch specific errors in user code | **High**     |
 | 2   | **Tracing not wired in test runner** — `trace_data` field exists in `TestResult` but no trace recording starts/stops during test execution                      | `src/test_runner/executor.rs`                    | No per-test trace files in reports                | **High**     |
 | 3   | **Reporters not wired to TestExecutor** — 7 reporters exist but `execute()` doesn't invoke any                                                                  | `src/test_runner/executor.rs` + `src/reporters/` | Test results have no output                       | **Critical** |
-| 4   | **No configuration file parser** — No `turbo-sheet.config.ts`/`.json` support                                                                                   | —                                                | Users must configure via code only                | **High**     |
+| 4   | **No configuration file parser** — No `turbosheet.config.ts`/`.json` support                                                                                    | —                                                | Users must configure via code only                | **High**     |
 | 5   | **No `Keyboard`/`Mouse`/`Touchscreen` input classes** — All input goes through page methods directly                                                            | `src/chromium/page.rs`                           | Limited granular input control                    | **Medium**   |
 | 6   | **No persistent browser contexts** — Only incognito; no way to launch with profile dir                                                                          | `src/browser/` module doesn't exist              | Can't test logged-in states, extensions           | **High**     |
 | 7   | **No CDPSession exposed to JS** — Raw CDP access unavailable to consumers                                                                                       | `src/chromium/`                                  | Power users can't send raw CDP commands           | **Medium**   |
@@ -865,7 +865,7 @@ Despite the gaps, TurboSheet has genuinely innovative or well-executed features:
 - Add `test.step()` for structured logging
 - Implement `ShardConfig` in executor for CI sharding
 - Add `ProjectDependency` ordering support
-- Create config file parser (`turbo-sheet.config.ts` / `.json`)
+- Create config file parser (`turbosheet.config.ts` / `.json`)
 
 **Impact**: Unblocks all test authoring. Without this phase, TurboSheet cannot run any user-defined tests.
 
@@ -944,12 +944,12 @@ Despite the gaps, TurboSheet has genuinely innovative or well-executed features:
 
 **Goal**: Production CI/CD integration.
 
-- Create CLI binary (`turbo-sheet` or `tsheet`) with flags:
+- Create CLI binary (`turbosheet` or `tsheet`) with flags:
   - `--headed`, `--browser`, `--project`, `--grep`, `--shard=x/y`
   - `--retries`, `--timeout`, `--workers`, `--reporter`, `--output`
   - `--update-snapshots`, `--forbid-only`, `--list`
   - `--global-setup`, `--global-teardown`, `--config`
-- Config file support: `turbo-sheet.config.ts` / `.json` / `.mjs`
+- Config file support: `turbosheet.config.ts` / `.json` / `.mjs`
 - Docker image with pre-installed browsers
 - CI-specific optimizations: `--ci` flag, JUnit XML output, GitHub Actions annotations
 - `--update-snapshots` for visual testing CI mode
@@ -983,7 +983,7 @@ Despite the gaps, TurboSheet has genuinely innovative or well-executed features:
 - **Sharding & merge-reports** — Split tests across CI nodes, merge JSON results
 - **Flaky test management** — Auto-retry config, flaky detection dashboard
 - **Comprehensive migration codegen** — `npx tsheet convert` from Playwright/Cypress/Puppeteer
-- **Plugin auto-discovery** — Scan `node_modules` for turbo-sheet plugins
+- **Plugin auto-discovery** — Scan `node_modules` for turbosheet plugins
 - **Dashboard / Cloud integration** — Result aggregation, history, trends
 
 ### Summary: Effort Estimation

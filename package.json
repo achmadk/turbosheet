@@ -1,5 +1,5 @@
 {
-  "name": "turbo-sheet",
+  "name": "turbosheet",
   "version": "0.1.0",
   "description": "TurboSheet - High-performance Rust browser automation for Node.js. 3x faster than Playwright, 50% less memory.",
   "keywords": [
