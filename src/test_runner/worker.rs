@@ -244,7 +244,7 @@ impl WorkerProcess {
 }
 
 /// Test result as received from the worker process.
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct WorkerTestResult {
     pub name: String,
     pub status: String,
@@ -253,4 +253,64 @@ pub struct WorkerTestResult {
     /// Paths to recorded video files for this test, if any.
     #[serde(default)]
     pub video_paths: Option<Vec<String>>,
+    /// Serialized trace events for this test, if trace recording was enabled.
+    #[serde(default)]
+    pub trace_data: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_trace_data_round_trip_through_worker_result() {
+        let trace_json = r#"{"events":[{"type":"action","action_type":"click","selector":"#btn","timestamp_ms":1000,"duration_ms":50,"result":"success"}],"metadata":{"test_name":"test-file"}}"#;
+
+        let json = serde_json::json!({
+            "name": "my test",
+            "status": "passed",
+            "error": null,
+            "duration_ms": 150,
+            "trace_data": trace_json,
+        });
+
+        let wr: WorkerTestResult = serde_json::from_value(json).unwrap();
+        assert_eq!(wr.name, "my test");
+        assert_eq!(wr.status, "passed");
+        assert_eq!(wr.duration_ms, 150);
+        assert_eq!(wr.trace_data.as_deref(), Some(trace_json));
+    }
+
+    #[test]
+    fn test_trace_data_is_none_when_not_present() {
+        let json = serde_json::json!({
+            "name": "no trace",
+            "status": "passed",
+            "error": null,
+            "duration_ms": 50,
+        });
+
+        let wr: WorkerTestResult = serde_json::from_value(json).unwrap();
+        assert!(wr.trace_data.is_none());
+    }
+
+    #[test]
+    fn test_trace_data_round_trip_serde() {
+        let trace_json = r#"{"events":[],"metadata":{"test_name":"test"}}"#.to_string();
+
+        let wr = WorkerTestResult {
+            name: "round-trip".to_string(),
+            status: "failed".to_string(),
+            error: Some("something broke".to_string()),
+            duration_ms: 200,
+            video_paths: None,
+            trace_data: Some(trace_json.clone()),
+        };
+
+        let serialized = serde_json::to_value(&wr).unwrap();
+        let deserialized: WorkerTestResult = serde_json::from_value(serialized).unwrap();
+        assert_eq!(deserialized.trace_data, Some(trace_json));
+        assert_eq!(deserialized.name, "round-trip");
+        assert_eq!(deserialized.status, "failed");
+    }
 }

@@ -35,6 +35,7 @@ interface TestResultMsg {
   error?: string;
   duration_ms: number;
   video_paths?: string[];
+  trace_data?: string;
 }
 
 const turbosheet = require("../../index.js");
@@ -137,6 +138,13 @@ async function executeTestFile(
 
     page = await context.newPage();
     await runtime.injectPageBridge(page);
+
+    // Clear any previous trace data before starting this test file
+    try {
+      turbosheet.trace_clear();
+    } catch (e) {
+      // Trace recording not available (traces feature disabled)
+    }
 
     // Start video recording if enabled
     if (videoOnFailure && page.video) {
@@ -375,6 +383,16 @@ async function executeTestFile(
       } catch (e) {
         console.warn("[VIDEO] Failed to stop recording:", e);
       }
+    }
+
+    // Serialize trace events and attach to results
+    try {
+      const traceData = turbosheet.trace_events_to_json();
+      for (const r of results) {
+        r.trace_data = traceData;
+      }
+    } catch (e) {
+      // Trace data not available (traces feature disabled)
     }
 
     if (page && typeof page.close === "function") {

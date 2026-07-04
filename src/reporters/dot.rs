@@ -6,14 +6,18 @@ impl DotReporter {
     pub fn write(results: &[TestCaseResult]) -> String {
         let mut output = String::new();
         for result in results {
-            match result.status.as_str() {
-                "passed" => output.push('.'),
-                "failed" => output.push('F'),
-                "skipped" => output.push('-'),
-                _ => output.push('?'),
-            }
+            output.push_str(&Self::write_single(result));
         }
         output
+    }
+
+    pub fn write_single(result: &TestCaseResult) -> String {
+        match result.status.as_str() {
+            "passed" => ".".to_string(),
+            "failed" => "F".to_string(),
+            "skipped" => "-".to_string(),
+            _ => "?".to_string(),
+        }
     }
 
     pub fn print_summary(result: &AggregatedTestResult) {

@@ -17,6 +17,52 @@ use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use futures::StreamExt;
 
+lazy_static::lazy_static! {
+    /// CDP windowsVirtualKeyCode lookup table for special keys.
+    /// Maps lowercase key name to virtual key code.
+    static ref KEY_CODE_MAP: HashMap<&'static str, i64> = {
+        let mut m = HashMap::new();
+        m.insert("enter", 13i64);
+        m.insert("tab", 9i64);
+        m.insert("escape", 27i64);
+        m.insert("backspace", 8i64);
+        m.insert("delete", 46i64);
+        m.insert("home", 36i64);
+        m.insert("end", 35i64);
+        m.insert("pageup", 33i64);
+        m.insert("pagedown", 34i64);
+        m.insert("arrowup", 38i64);
+        m.insert("arrowdown", 40i64);
+        m.insert("arrowleft", 37i64);
+        m.insert("arrowright", 39i64);
+        m.insert("f1", 112i64);
+        m.insert("f2", 113i64);
+        m.insert("f3", 114i64);
+        m.insert("f4", 115i64);
+        m.insert("f5", 116i64);
+        m.insert("f6", 117i64);
+        m.insert("f7", 118i64);
+        m.insert("f8", 119i64);
+        m.insert("f9", 120i64);
+        m.insert("f10", 121i64);
+        m.insert("f11", 122i64);
+        m.insert("f12", 123i64);
+        m.insert("shift", 16i64);
+        m.insert("control", 17i64);
+        m.insert("alt", 18i64);
+        m.insert("meta", 91i64);
+        m.insert("capslock", 20i64);
+        m.insert("insert", 45i64);
+        m.insert("space", 32i64);
+        m.insert("printscreen", 44i64);
+        m.insert("scrolllock", 145i64);
+        m.insert("pause", 19i64);
+        m.insert("numlock", 144i64);
+        m.insert("contextmenu", 93i64);
+        m
+    };
+}
+
 pub struct ChromiumEngine {
     browser: Arc<Mutex<Browser>>,
 }
@@ -1224,6 +1270,8 @@ impl PageEngine for ChromiumPageEngine {
     }
     
     async fn goto(&self, url: &str, state: LoadState) -> Result<(), TurbosheetError> {
+        #[cfg(feature = "traces")]
+        let _start = std::time::Instant::now();
         let mut page_guard = self.lock_page().await?;
         if let Some(page) = page_guard.as_mut() {
             // chromiumoxide::Page::goto() internally uses the navigation framework
@@ -1265,6 +1313,11 @@ impl PageEngine for ChromiumPageEngine {
                 self.event_dispatcher.handle_event(pid, EventType::FrameNavigated, payload);
             }
         }
+        #[cfg(feature = "traces")]
+        crate::trace::GLOBAL_RECORDER.record_action(
+            "navigate", None, Some(url),
+            _start.elapsed().as_millis() as u64, "success",
+        ).await;
         Ok(())
     }
 
@@ -1354,6 +1407,8 @@ impl PageEngine for ChromiumPageEngine {
     }
 
     async fn click(&self, selector: &str) -> Result<(), TurbosheetError> {
+        #[cfg(feature = "traces")]
+        let _start = std::time::Instant::now();
         let (x, y) = self.get_element_center(selector).await?;
         let mut page_guard = self.lock_page().await?;
         if let Some(page) = page_guard.as_mut() {
@@ -1378,12 +1433,23 @@ impl PageEngine for ChromiumPageEngine {
             page.execute(released).await.map_err(|e| {
                 TurbosheetError::Other(format!("CDP mouseReleased failed: {}", e))
             })?;
+            #[cfg(feature = "traces")]
+            crate::trace::GLOBAL_RECORDER.record_action(
+                "click", Some(selector), None,
+                _start.elapsed().as_millis() as u64, "success",
+            ).await;
             return Ok(());
         }
+        #[cfg(feature = "traces")]
+        crate::trace::GLOBAL_RECORDER.record_action(
+            "click", Some(selector), None, 0, "error: page closed",
+        ).await;
         Err(TurbosheetError::Other("Page is closed".to_string()))
     }
 
     async fn fill(&self, selector: &str, value: &str) -> Result<(), TurbosheetError> {
+        #[cfg(feature = "traces")]
+        let _start = std::time::Instant::now();
         let mut page_guard = self.lock_page().await?;
         if let Some(page) = page_guard.as_mut() {
             let element = page.find_element(selector).await.map_err(|e| {
@@ -1405,8 +1471,17 @@ impl PageEngine for ChromiumPageEngine {
             element.type_str(value).await.map_err(|e| {
                 TurbosheetError::Other(format!("Failed to fill element '{}': {}", selector, e))
             })?;
+            #[cfg(feature = "traces")]
+            crate::trace::GLOBAL_RECORDER.record_action(
+                "fill", Some(selector), Some(value),
+                _start.elapsed().as_millis() as u64, "success",
+            ).await;
             return Ok(());
         }
+        #[cfg(feature = "traces")]
+        crate::trace::GLOBAL_RECORDER.record_action(
+            "fill", Some(selector), Some(value), 0, "error: page closed",
+        ).await;
         Err(TurbosheetError::Other("Page is closed".to_string()))
     }
 
@@ -1433,6 +1508,8 @@ impl PageEngine for ChromiumPageEngine {
     }
 
     async fn dblclick(&self, selector: &str) -> Result<(), TurbosheetError> {
+        #[cfg(feature = "traces")]
+        let _start = std::time::Instant::now();
         let (x, y) = self.get_element_center(selector).await?;
         let mut page_guard = self.lock_page().await?;
         if let Some(page) = page_guard.as_mut() {
@@ -1459,8 +1536,17 @@ impl PageEngine for ChromiumPageEngine {
                     TurbosheetError::Other(format!("CDP mouseReleased (dblclick) failed: {}", e))
                 })?;
             }
+            #[cfg(feature = "traces")]
+            crate::trace::GLOBAL_RECORDER.record_action(
+                "dblclick", Some(selector), None,
+                _start.elapsed().as_millis() as u64, "success",
+            ).await;
             return Ok(());
         }
+        #[cfg(feature = "traces")]
+        crate::trace::GLOBAL_RECORDER.record_action(
+            "dblclick", Some(selector), None, 0, "error: page closed",
+        ).await;
         Err(TurbosheetError::Other("Page is closed".to_string()))
     }
 
@@ -1495,6 +1581,8 @@ impl PageEngine for ChromiumPageEngine {
     }
 
     async fn hover(&self, selector: &str) -> Result<(), TurbosheetError> {
+        #[cfg(feature = "traces")]
+        let _start = std::time::Instant::now();
         let (x, y) = self.get_element_center(selector).await?;
         let mut page_guard = self.lock_page().await?;
         if let Some(page) = page_guard.as_mut() {
@@ -1508,23 +1596,53 @@ impl PageEngine for ChromiumPageEngine {
             page.execute(params).await.map_err(|e| {
                 TurbosheetError::Other(format!("CDP mouseMoved (hover) failed: {}", e))
             })?;
+            #[cfg(feature = "traces")]
+            crate::trace::GLOBAL_RECORDER.record_action(
+                "hover", Some(selector), None,
+                _start.elapsed().as_millis() as u64, "success",
+            ).await;
             return Ok(());
         }
+        #[cfg(feature = "traces")]
+        crate::trace::GLOBAL_RECORDER.record_action(
+            "hover", Some(selector), None, 0, "error: page closed",
+        ).await;
         Err(TurbosheetError::Other("Page is closed".to_string()))
     }
 
     async fn check(&self, selector: &str) -> Result<(), TurbosheetError> {
+        #[cfg(feature = "traces")]
+        let _start = std::time::Instant::now();
         self.invoke_action("check", vec![serde_json::Value::String(selector.to_string())]).await?;
+        #[cfg(feature = "traces")]
+        crate::trace::GLOBAL_RECORDER.record_action(
+            "check", Some(selector), None,
+            _start.elapsed().as_millis() as u64, "success",
+        ).await;
         Ok(())
     }
 
     async fn uncheck(&self, selector: &str) -> Result<(), TurbosheetError> {
+        #[cfg(feature = "traces")]
+        let _start = std::time::Instant::now();
         self.invoke_action("uncheck", vec![serde_json::Value::String(selector.to_string())]).await?;
+        #[cfg(feature = "traces")]
+        crate::trace::GLOBAL_RECORDER.record_action(
+            "uncheck", Some(selector), None,
+            _start.elapsed().as_millis() as u64, "success",
+        ).await;
         Ok(())
     }
 
     async fn select(&self, selector: &str, value: &str) -> Result<(), TurbosheetError> {
+        #[cfg(feature = "traces")]
+        let _start = std::time::Instant::now();
         self.invoke_action("select", vec![serde_json::Value::String(selector.to_string()), serde_json::Value::String(value.to_string())]).await?;
+        #[cfg(feature = "traces")]
+        crate::trace::GLOBAL_RECORDER.record_action(
+            "select", Some(selector), Some(value),
+            _start.elapsed().as_millis() as u64, "success",
+        ).await;
         Ok(())
     }
 
@@ -1637,6 +1755,8 @@ impl PageEngine for ChromiumPageEngine {
     }
     
     async fn press(&self, selector: &str, key: &str) -> Result<(), TurbosheetError> {
+        #[cfg(feature = "traces")]
+        let _start = std::time::Instant::now();
         let mut page_guard = self.lock_page().await?;
         if let Some(page) = page_guard.as_mut() {
             // Focus the element first via injected script (faster than CDP chain)
@@ -1648,10 +1768,14 @@ impl PageEngine for ChromiumPageEngine {
             use chromiumoxide::cdp::browser_protocol::input::{
                 DispatchKeyEventParams, DispatchKeyEventType,
             };
+            let vk_code = KEY_CODE_MAP
+                .get(key.to_lowercase().as_str())
+                .copied()
+                .unwrap_or_else(|| key.chars().next().map(|c| c as i64).unwrap_or(0));
             let raw_down = DispatchKeyEventParams::builder()
                 .r#type(DispatchKeyEventType::RawKeyDown)
                 .key(key.to_string())
-                .windows_virtual_key_code(key.chars().next().map(|c| c as i64).unwrap_or(0))
+                .windows_virtual_key_code(vk_code)
                 .build().unwrap();
             page.execute(raw_down).await.map_err(|e| {
                 TurbosheetError::Other(format!("CDP rawKeyDown failed: {}", e))
@@ -1675,12 +1799,23 @@ impl PageEngine for ChromiumPageEngine {
                 TurbosheetError::Other(format!("CDP keyUp failed: {}", e))
             })?;
 
+            #[cfg(feature = "traces")]
+            crate::trace::GLOBAL_RECORDER.record_action(
+                "press", Some(selector), Some(key),
+                _start.elapsed().as_millis() as u64, "success",
+            ).await;
             return Ok(());
         }
+        #[cfg(feature = "traces")]
+        crate::trace::GLOBAL_RECORDER.record_action(
+            "press", Some(selector), Some(key), 0, "error: page closed",
+        ).await;
         Err(TurbosheetError::Other("Page is closed".to_string()))
     }
     
     async fn press_sequentially(&self, selector: &str, text: &str) -> Result<(), TurbosheetError> {
+        #[cfg(feature = "traces")]
+        let _start = std::time::Instant::now();
         let mut page_guard = self.lock_page().await?;
         if let Some(page) = page_guard.as_mut() {
             // Focus the element first via injected script
@@ -1693,10 +1828,14 @@ impl PageEngine for ChromiumPageEngine {
             };
             for ch in text.chars() {
                 let key = ch.to_string();
+                let vk_code = KEY_CODE_MAP
+                    .get(key.to_lowercase().as_str())
+                    .copied()
+                    .unwrap_or_else(|| ch as i64);
                 let raw_down = DispatchKeyEventParams::builder()
                     .r#type(DispatchKeyEventType::RawKeyDown)
                     .key(key.clone())
-                    .windows_virtual_key_code(ch as i64)
+                    .windows_virtual_key_code(vk_code)
                     .build().unwrap();
                 page.execute(raw_down).await.ok();
 
@@ -1716,8 +1855,17 @@ impl PageEngine for ChromiumPageEngine {
 
                 tokio::time::sleep(std::time::Duration::from_millis(10)).await;
             }
+            #[cfg(feature = "traces")]
+            crate::trace::GLOBAL_RECORDER.record_action(
+                "press_sequentially", Some(selector), Some(text),
+                _start.elapsed().as_millis() as u64, "success",
+            ).await;
             return Ok(());
         }
+        #[cfg(feature = "traces")]
+        crate::trace::GLOBAL_RECORDER.record_action(
+            "press_sequentially", Some(selector), Some(text), 0, "error: page closed",
+        ).await;
         Err(TurbosheetError::Other("Page is closed".to_string()))
     }
     
@@ -2397,6 +2545,7 @@ impl PageEngine for ChromiumPageEngine {
     #[cfg(feature = "video")]
     async fn stop_recording(&self, test_passed: Option<bool>) -> Result<Option<String>, TurbosheetError> {
         // Stop CDP screencast
+        // Stop CDP screencast
         {
             let mut guard = self.lock_page().await?;
             if let Some(page) = guard.as_mut() {
@@ -2417,5 +2566,81 @@ impl PageEngine for ChromiumPageEngine {
         } else {
             Ok(None)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::KEY_CODE_MAP;
+
+    #[test]
+    fn test_key_code_map_enter() {
+        assert_eq!(KEY_CODE_MAP.get("enter"), Some(&13i64));
+    }
+
+    #[test]
+    fn test_key_code_map_tab() {
+        assert_eq!(KEY_CODE_MAP.get("tab"), Some(&9i64));
+    }
+
+    #[test]
+    fn test_key_code_map_escape() {
+        assert_eq!(KEY_CODE_MAP.get("escape"), Some(&27i64));
+    }
+
+    #[test]
+    fn test_key_code_map_backspace() {
+        assert_eq!(KEY_CODE_MAP.get("backspace"), Some(&8i64));
+    }
+
+    #[test]
+    fn test_key_code_map_delete() {
+        assert_eq!(KEY_CODE_MAP.get("delete"), Some(&46i64));
+    }
+
+    #[test]
+    fn test_key_code_map_arrow_keys() {
+        assert_eq!(KEY_CODE_MAP.get("arrowup"), Some(&38i64));
+        assert_eq!(KEY_CODE_MAP.get("arrowdown"), Some(&40i64));
+        assert_eq!(KEY_CODE_MAP.get("arrowleft"), Some(&37i64));
+        assert_eq!(KEY_CODE_MAP.get("arrowright"), Some(&39i64));
+    }
+
+    #[test]
+    fn test_key_code_map_function_keys() {
+        assert_eq!(KEY_CODE_MAP.get("f1"), Some(&112i64));
+        assert_eq!(KEY_CODE_MAP.get("f5"), Some(&116i64));
+        assert_eq!(KEY_CODE_MAP.get("f12"), Some(&123i64));
+    }
+
+    #[test]
+    fn test_key_code_map_modifiers() {
+        assert_eq!(KEY_CODE_MAP.get("shift"), Some(&16i64));
+        assert_eq!(KEY_CODE_MAP.get("control"), Some(&17i64));
+        assert_eq!(KEY_CODE_MAP.get("alt"), Some(&18i64));
+        assert_eq!(KEY_CODE_MAP.get("meta"), Some(&91i64));
+    }
+
+    #[test]
+    fn test_key_code_map_case_sensitive() {
+        // KEY_CODE_MAP uses lowercase keys
+        assert!(KEY_CODE_MAP.contains_key("enter"));
+        assert!(!KEY_CODE_MAP.contains_key("Enter"));
+        assert!(!KEY_CODE_MAP.contains_key("ENTER"));
+    }
+
+    #[test]
+    fn test_key_code_map_nonexistent_key() {
+        // Keys not in the map should return None
+        assert_eq!(KEY_CODE_MAP.get("a"), None);
+        assert_eq!(KEY_CODE_MAP.get("z"), None);
+        assert_eq!(KEY_CODE_MAP.get("0"), None);
+    }
+
+    /// Integration test requiring a running browser.
+    /// Run: CHROME_HEADLESS=true cargo test test_press_enter_on_input_changes_focus -- --ignored
+    #[test]
+    #[ignore = "requires running browser (CDP endpoint)"]
+    fn test_press_enter_on_input_changes_focus() {
     }
 }

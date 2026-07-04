@@ -44,7 +44,14 @@ impl TestExecutor {
         }
     }
 
-    pub async fn execute(&self, files: Vec<TestFile>) -> Result<Vec<TestResult>, TurbosheetError> {
+    /// Execute tests and return results. If `stream_callback` is provided,
+    /// it is called with each `TestResult` as it arrives from the worker channel,
+    /// enabling real-time reporter output.
+    pub async fn execute(
+        &self,
+        files: Vec<TestFile>,
+        stream_callback: Option<Box<dyn Fn(&TestResult) + Send>>,
+    ) -> Result<Vec<TestResult>, TurbosheetError> {
         let workers = self.config.workers.unwrap_or(1) as usize;
         let screenshot_on_failure = self.config.screenshot_on_failure.unwrap_or(true);
         let screenshot_dir = self.config.screenshot_dir.clone()
@@ -71,7 +78,7 @@ impl TestExecutor {
             self.run_global_setup(setup_file).await?;
         }
 
-        let result = self.execute_tests(files, workers, screenshot_on_failure, &screenshot_dir, video_on_failure, &video_dir).await;
+        let result = self.execute_tests(files, workers, screenshot_on_failure, &screenshot_dir, video_on_failure, &video_dir, stream_callback).await;
 
         if let Some(ref teardown_file) = self.config.global_teardown {
             self.run_global_teardown(teardown_file).await;
@@ -141,6 +148,7 @@ impl TestExecutor {
         screenshot_dir: &str,
         video_on_failure: bool,
         video_dir: &str,
+        stream_callback: Option<Box<dyn Fn(&TestResult) + Send>>,
     ) -> Result<Vec<TestResult>, TurbosheetError> {
         let (tx, mut rx) = mpsc::channel(100);
         let mut handles: Vec<JoinHandle<()>> = Vec::new();
@@ -260,7 +268,7 @@ impl TestExecutor {
                                         duration_ms: wr.duration_ms,
                                         retries: attempt,
                                         screenshot_paths,
-                                        trace_data: None,
+                                        trace_data: wr.trace_data.clone(),
                                         video_paths,
                                     };
 
@@ -310,7 +318,10 @@ impl TestExecutor {
         drop(tx);
 
         let mut results = Vec::new();
-        while let Some(result) = rx.recv().await {
+        while let Some(mut result) = rx.recv().await {
+            if let Some(ref callback) = stream_callback {
+                callback(&result);
+            }
             results.push(result);
         }
 
@@ -367,7 +378,7 @@ impl TestExecutor {
             for project in projects {
                 info!("Executing project: {}", project.name);
                 let files = super::discovery::discover_tests(&project.test_dir, &project.test_match.clone().unwrap_or_else(|| vec!["**/*.tsheet.ts".to_string()]), None)?;
-                let results = self.execute_tests(files, 1, false, "test-results", false, "test-results/videos").await?;
+                let results = self.execute_tests(files, 1, false, "test-results", false, "test-results/videos", None).await?;
                 all_results.extend(results);
             }
         }

@@ -55,7 +55,41 @@ pub async fn run_tests(config: config::TestConfig) -> Result<Vec<executor::TestR
     }
 
     let executor = executor::TestExecutor::new(config.clone());
-    let results = executor.execute(files).await?;
+
+    // Build streaming callback for real-time reporter output
+    let stream_callback: Option<Box<dyn Fn(&executor::TestResult) + Send>> = config.reporter.as_ref().map(|reporter_str| {
+        let reporter_types = parse_reporters(reporter_str);
+        Box::new(move |result: &executor::TestResult| {
+            let tc = crate::reporters::TestCaseResult {
+                title: result.name.clone(),
+                status: format!("{:?}", result.status).to_lowercase(),
+                duration_ms: result.duration_ms,
+                error: result.error_message.clone(),
+                retry: result.retries,
+                screenshot_paths: result.screenshot_paths.clone().unwrap_or_default(),
+                trace_data: result.trace_data.clone(),
+            };
+            for rt in &reporter_types {
+                match rt {
+                    crate::reporters::ReporterType::Dot => {
+                        let output = crate::reporters::dot::DotReporter::write_single(&tc);
+                        print!("{}", output);
+                    },
+                    crate::reporters::ReporterType::Line => {
+                        let output = crate::reporters::line::LineReporter::write_single(&tc);
+                        print!("{}", output);
+                    },
+                    crate::reporters::ReporterType::List => {
+                        let output = crate::reporters::list::ListReporter::write_single(&tc);
+                        print!("{}", output);
+                    },
+                    _ => {}, // Final-report reporters handled after all results
+                }
+            }
+        })
+    });
+
+    let results = executor.execute(files, stream_callback).await?;
 
     if let Some(ref reporter_str) = config.reporter {
         let reporter_types = parse_reporters(reporter_str);

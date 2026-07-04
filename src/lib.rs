@@ -72,6 +72,14 @@ pub fn trace_start_recording() {
 
 #[cfg(feature = "traces")]
 #[napi]
+pub fn trace_clear() {
+    futures::executor::block_on(async {
+        trace::GLOBAL_RECORDER.clear().await;
+    });
+}
+
+#[cfg(feature = "traces")]
+#[napi]
 pub fn trace_stop_and_serialize(test_name: String) -> Result<Buffer> {
     let events = futures::executor::block_on(async {
         trace::GLOBAL_RECORDER.get_events().await
@@ -127,6 +135,12 @@ pub fn trace_events_to_json() -> Result<String> {
 #[napi]
 pub fn trace_start_recording() {
     panic!("Trace feature not enabled. Build with --features traces");
+}
+
+#[cfg(not(feature = "traces"))]
+#[napi]
+pub fn trace_clear() {
+    // no-op when traces feature is disabled
 }
 
 #[cfg(not(feature = "traces"))]

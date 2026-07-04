@@ -75,5 +75,116 @@ impl AssertionEngine {
 
 #[cfg(test)]
 mod tests {
-    // Tests disabled to fix compilation errors
+    use super::*;
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn test_poll_immediate_success() {
+        let engine = AssertionEngine {
+            timeout: Duration::from_millis(100),
+            ..Default::default()
+        };
+
+        let result = engine
+            .poll(|| async { Ok::<_, String>(42) })
+            .await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 42);
+    }
+
+    #[tokio::test]
+    async fn test_poll_with_timeout_error() {
+        let engine = AssertionEngine {
+            timeout: Duration::from_millis(100),
+            initial_interval: Duration::from_millis(10),
+            max_interval: Duration::from_millis(50),
+        };
+
+        let result = engine
+            .poll_with_timeout(Duration::from_millis(100), || async {
+                Err::<(), String>("not ready".to_string())
+            })
+            .await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("timeout"),
+            "Expected timeout in error message, got: {}",
+            err
+        );
+    }
+
+    #[tokio::test]
+    async fn test_jitter_within_bounds() {
+        // compute_jitter is private but accessible in cfg(test) via `use super::*`
+        for interval_ms in [1u64, 10, 50, 100, 200, 500] {
+            let interval = Duration::from_millis(interval_ms);
+            let max_jitter = interval_ms / 10;
+
+            // Run 100 samples to verify the jitter property
+            for _ in 0..100 {
+                let jitter = AssertionEngine::compute_jitter(interval);
+                assert!(
+                    jitter.as_millis() as u64 <= max_jitter,
+                    "jitter {}ms exceeds 10% of {}ms interval (max {}ms)",
+                    jitter.as_millis(),
+                    interval_ms,
+                    max_jitter
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_exponential_backoff() {
+        let engine = AssertionEngine {
+            timeout: Duration::from_secs(10),
+            initial_interval: Duration::from_millis(10),
+            max_interval: Duration::from_millis(50),
+        };
+
+        let start = Instant::now();
+        let mut call_count = 0u32;
+        let result = engine
+            .poll_with_timeout(Duration::from_millis(500), || {
+                call_count += 1;
+                async { Err::<(), String>("not yet".to_string()) }
+            })
+            .await;
+
+        assert!(result.is_err());
+        // With 10ms initial + jitter, doubling up to 50ms max, should get ~5-15 polls in 500ms
+        assert!(
+            call_count >= 3,
+            "Expected at least 3 polls with backoff, got {}",
+            call_count
+        );
+    }
+
+    #[tokio::test]
+    async fn test_poll_count_in_error() {
+        let engine = AssertionEngine {
+            timeout: Duration::from_millis(500),
+            initial_interval: Duration::from_millis(10),
+            max_interval: Duration::from_millis(50),
+        };
+
+        let mut call_count = 0u32;
+        let result = engine
+            .poll_with_timeout(Duration::from_millis(200), || {
+                call_count += 1;
+                async { Err::<(), String>("fail".to_string()) }
+            })
+            .await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        // The error message includes the poll count, e.g. "Assertion timeout after 200ms (5 polls). fail"
+        assert!(
+            err.contains("polls"),
+            "Expected poll count in error message, got: {}",
+            err
+        );
+    }
 }

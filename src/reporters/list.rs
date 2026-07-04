@@ -7,20 +7,27 @@ impl ListReporter {
         let mut output = String::new();
 
         for result in results {
-            let symbol = match result.status.as_str() {
-                "passed" => "\u{2713}",
-                "failed" => "\u{2717}",
-                "skipped" => "-",
-                _ => "?",
-            };
+            output.push_str(&Self::write_single(result));
+        }
 
-            output.push_str(&format!("    {} {} ({}ms)\n", symbol, result.title, result.duration_ms));
+        output
+    }
 
-            if result.status == "failed" {
-                if let Some(ref error) = result.error {
-                    for line in error.lines() {
-                        output.push_str(&format!("      {}\n", line));
-                    }
+    pub fn write_single(result: &TestCaseResult) -> String {
+        let mut output = String::new();
+        let symbol = match result.status.as_str() {
+            "passed" => "\u{2713}",
+            "failed" => "\u{2717}",
+            "skipped" => "-",
+            _ => "?",
+        };
+
+        output.push_str(&format!("    {} {} ({}ms)\n", symbol, result.title, result.duration_ms));
+
+        if result.status == "failed" {
+            if let Some(ref error) = result.error {
+                for line in error.lines() {
+                    output.push_str(&format!("      {}\n", line));
                 }
             }
         }
