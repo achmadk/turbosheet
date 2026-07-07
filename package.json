@@ -38,14 +38,14 @@
     "prepare": "vp config"
   },
   "dependencies": {
-    "@swc/core": "^1.15.41",
+    "@swc/core": "^1.15.43",
     "isolated-vm": "^7.0.0"
   },
   "devDependencies": {
     "@napi-rs/cli": "^3.7.2",
     "@playwright/test": "^1.61.1",
-    "@types/node": "^25.9.3",
-    "cypress": "^15.18.0",
+    "@types/node": "^26.1.0",
+    "cypress": "^15.18.1",
     "playwright": "^1.61.1",
     "typescript": "^6.0.3",
     "vite": "catalog:",
@@ -63,5 +63,5 @@
       "aarch64-pc-windows-msvc"
     ]
   },
-  "packageManager": "pnpm@11.9.0"
+  "packageManager": "pnpm@11.10.0"
 }

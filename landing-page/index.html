@@ -502,6 +502,189 @@
         color: var(--text-primary);
       }
 
+      /* ---- Progress & Roadmap ---- */
+      .roadmap-section {
+        text-align: center;
+      }
+      .roadmap-sub {
+        margin-top: 2.5rem;
+        text-align: left;
+      }
+
+      /* Progress bars */
+      .progress-block {
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+      }
+      .progress-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.65rem;
+      }
+      .progress-row:last-of-type {
+        margin-bottom: 0;
+        padding-top: 0.75rem;
+        border-top: 1px solid var(--border);
+      }
+      .progress-label {
+        font-family: var(--font-display);
+        font-size: 0.8rem;
+        color: var(--text-primary);
+        min-width: 100px;
+        flex-shrink: 0;
+      }
+      .progress-bar {
+        flex: 1;
+        height: 7px;
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 4px;
+        overflow: hidden;
+        min-width: 80px;
+      }
+      .progress-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        background: var(--accent);
+      }
+      .progress-pct {
+        font-family: var(--font-display);
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        min-width: 32px;
+        text-align: right;
+        flex-shrink: 0;
+      }
+      .progress-loc {
+        font-family: var(--font-display);
+        font-size: 0.68rem;
+        color: var(--text-muted);
+        min-width: 48px;
+        text-align: right;
+        flex-shrink: 0;
+      }
+
+      /* Hard Blockers */
+      .blockers {
+        background: oklch(0.7 0.14 55 / 0.06);
+        border: 1px solid oklch(0.7 0.14 55 / 0.15);
+        border-radius: 12px;
+        padding: 1.75rem 2rem;
+        margin-bottom: 2rem;
+        text-align: left;
+      }
+      .blockers-title {
+        font-family: var(--font-display);
+        font-size: 0.75rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--accent-warm);
+        margin-bottom: 1rem;
+      }
+      .blocker-item {
+        display: flex;
+        gap: 0.75rem;
+        font-size: 0.88rem;
+        color: var(--text-secondary);
+        line-height: 1.5;
+        margin-bottom: 0.5rem;
+      }
+      .blocker-item:last-child {
+        margin-bottom: 0;
+      }
+      .blocker-item::before {
+        content: "■";
+        color: var(--accent-warm);
+        flex-shrink: 0;
+      }
+
+      /* Roadmap phases */
+      .roadmap-phases {
+        background: var(--bg-surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .roadmap-phase {
+        padding: 1.2rem 2rem;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        transition: background 0.2s;
+      }
+      .roadmap-phase:last-child {
+        border-bottom: none;
+      }
+      .roadmap-phase:hover {
+        background: var(--bg-elevated);
+      }
+      .roadmap-phase--now {
+        background: oklch(0.75 0.18 200 / 0.04);
+        border-left: 3px solid var(--accent);
+      }
+      .phase-header {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin-bottom: 0.35rem;
+        flex-wrap: wrap;
+      }
+      .phase-name {
+        font-family: var(--font-display);
+        font-size: 0.85rem;
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+      .phase-tag {
+        display: inline-block;
+        padding: 0.12rem 0.45rem;
+        border-radius: 4px;
+        font-family: var(--font-display);
+        font-size: 0.62rem;
+        letter-spacing: 0.05em;
+        background: var(--bg-elevated);
+        color: var(--text-muted);
+        border: 1px solid var(--border);
+      }
+      .phase-tag--now {
+        background: var(--accent);
+        color: #06060f;
+        border-color: var(--accent);
+        font-weight: 600;
+      }
+      .phase-goal {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.35rem;
+      }
+      .phase-detail {
+        font-size: 0.77rem;
+        color: var(--text-muted);
+        line-height: 1.5;
+      }
+      .roadmap-estimate {
+        margin-top: 1.5rem;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        text-align: center;
+        line-height: 1.6;
+      }
+      .roadmap-attribution {
+        margin-top: 1rem;
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        text-align: center;
+      }
+      .roadmap-attribution a {
+        color: var(--text-secondary);
+        text-decoration: none;
+      }
+      .roadmap-attribution a:hover {
+        color: var(--text-primary);
+      }
+
       /* ---- Responsive ---- */
       @media (max-width: 640px) {
         .nav-links {
@@ -536,6 +719,7 @@
           <li><a href="#features">Features</a></li>
           <li><a href="#architecture">Architecture</a></li>
           <li><a href="#code">API</a></li>
+          <li><a href="#roadmap">Roadmap</a></li>
           <li>
             <a href="https://github.com/achmadk/turbosheet" target="_blank" class="nav-cta"
               >GitHub →</a
@@ -756,6 +940,268 @@
   <span class="kw">await</span> page.<span class="fn">goto</span>(<span class="str">'https://example.com'</span>);
   <span class="fn">expect</span>(<span class="kw">await</span> page.<span class="prop">title</span>()).<span class="fn">toBe</span>(<span class="str">'Example Domain'</span>);
 });</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== PROGRESS & ROADMAP ==================== -->
+    <section id="roadmap" class="roadmap-section">
+      <div class="container">
+        <p class="label-sm section-label">Progress &amp; Roadmap</p>
+        <h2 style="text-align: center">Current state and<br />what's coming next.</h2>
+
+        <!-- Engine Completion -->
+        <div class="roadmap-sub">
+          <h3 style="margin-bottom: 0.6rem">Engine Completion</h3>
+          <div class="progress-block">
+            <div class="progress-row">
+              <span class="progress-label">Chromium</span>
+              <div class="progress-bar">
+                <div class="progress-bar-fill" style="width: 65%"></div>
+              </div>
+              <span class="progress-pct">65%</span>
+              <span class="progress-loc">2,500+</span>
+            </div>
+            <div class="progress-row">
+              <span class="progress-label">JS/TS Layer</span>
+              <div class="progress-bar">
+                <div class="progress-bar-fill" style="width: 65%"></div>
+              </div>
+              <span class="progress-pct">65%</span>
+              <span class="progress-loc">425+</span>
+            </div>
+            <div class="progress-row">
+              <span class="progress-label">Reporting</span>
+              <div class="progress-bar">
+                <div class="progress-bar-fill" style="width: 60%"></div>
+              </div>
+              <span class="progress-pct">60%</span>
+              <span class="progress-loc">1,000+</span>
+            </div>
+            <div class="progress-row">
+              <span class="progress-label">Trace System</span>
+              <div class="progress-bar">
+                <div class="progress-bar-fill" style="width: 50%"></div>
+              </div>
+              <span class="progress-pct">50%</span>
+              <span class="progress-loc">600+</span>
+            </div>
+            <div class="progress-row">
+              <span class="progress-label">Test Runner</span>
+              <div class="progress-bar">
+                <div class="progress-bar-fill" style="width: 35%"></div>
+              </div>
+              <span class="progress-pct">35%</span>
+              <span class="progress-loc">1,200+</span>
+            </div>
+            <div class="progress-row">
+              <span class="progress-label">Video Recording</span>
+              <div class="progress-bar">
+                <div class="progress-bar-fill" style="width: 30%"></div>
+              </div>
+              <span class="progress-pct">30%</span>
+              <span class="progress-loc">550+</span>
+            </div>
+            <div class="progress-row">
+              <span class="progress-label">Firefox</span>
+              <div class="progress-bar">
+                <div class="progress-bar-fill" style="width: 25%"></div>
+              </div>
+              <span class="progress-pct">25%</span>
+              <span class="progress-loc">650+</span>
+            </div>
+            <div class="progress-row">
+              <span class="progress-label">WebKit</span>
+              <div class="progress-bar">
+                <div class="progress-bar-fill" style="width: 20%"></div>
+              </div>
+              <span class="progress-pct">20%</span>
+              <span class="progress-loc">650+</span>
+            </div>
+            <div class="progress-row">
+              <span class="progress-label">Plugin System</span>
+              <div class="progress-bar">
+                <div class="progress-bar-fill" style="width: 10%"></div>
+              </div>
+              <span class="progress-pct">10%</span>
+              <span class="progress-loc">130+</span>
+            </div>
+            <div class="progress-row">
+              <span class="progress-label">Migration</span>
+              <div class="progress-bar">
+                <div class="progress-bar-fill" style="width: 5%"></div>
+              </div>
+              <span class="progress-pct">5%</span>
+              <span class="progress-loc">180+</span>
+            </div>
+            <div class="progress-row">
+              <span class="progress-label" style="font-weight: 500; color: var(--accent)"
+                >Overall</span
+              >
+              <div class="progress-bar">
+                <div
+                  class="progress-bar-fill"
+                  style="width: 35%; background: var(--accent-warm)"
+                ></div>
+              </div>
+              <span class="progress-pct" style="color: var(--accent-warm)">~35%</span>
+              <span class="progress-loc">~8,500</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hard Blockers -->
+        <div class="roadmap-sub">
+          <div class="blockers">
+            <div class="blockers-title">Hard Blockers — v1.0 Critical</div>
+            <div class="blocker-item">
+              <span
+                ><code>test()</code> / <code>describe()</code> / lifecycle hooks are empty stubs —
+                cannot define or run tests</span
+              >
+            </div>
+            <div class="blocker-item">
+              <span
+                >7 built-in reporters exist but are not wired to <code>TestExecutor</code> — no
+                output from test runs</span
+              >
+            </div>
+            <div class="blocker-item">
+              <span>No CLI binary or config file parser — cannot integrate in CI pipelines</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Roadmap -->
+        <div class="roadmap-sub">
+          <h3 style="margin-bottom: 0.6rem">Implementation Roadmap</h3>
+          <div class="roadmap-phases">
+            <div class="roadmap-phase roadmap-phase--now">
+              <div class="phase-header">
+                <span class="phase-name">Phase 0 · Quick Wins</span>
+                <span class="phase-tag phase-tag--now">NOW</span>
+                <span class="phase-tag">1-2 wks</span>
+              </div>
+              <div class="phase-goal">Wire existing but unwired subsystems end-to-end.</div>
+              <div class="phase-detail">
+                Wire reporters to executor, CDP screencast → video recording, trace per test,
+                implement Keyboard.press(), enable assertion engine tests
+              </div>
+            </div>
+
+            <div class="roadmap-phase">
+              <div class="phase-header">
+                <span class="phase-name">Phase 1 · Test Runner Core</span>
+                <span class="phase-tag">3-4 wks</span>
+              </div>
+              <div class="phase-goal">
+                Users can define and run tests end-to-end with reporting.
+              </div>
+              <div class="phase-detail">
+                Implement test()/describe()/hooks, wire all 7 reporters to executor, add skip/only
+                modifiers, sharding, config file parser
+              </div>
+            </div>
+
+            <div class="roadmap-phase">
+              <div class="phase-header">
+                <span class="phase-name">Phase 2 · Auto-Waiting &amp; Actionability</span>
+                <span class="phase-tag">3-4 wks</span>
+              </div>
+              <div class="phase-goal">Reliable interactions without explicit waits.</div>
+              <div class="phase-detail">
+                Visibility/enabled/stability checks before actions, stale element retry,
+                configurable action timeout, force option, proper Locator struct
+              </div>
+            </div>
+
+            <div class="roadmap-phase">
+              <div class="phase-header">
+                <span class="phase-name">Phase 3 · Locator Engine Completion</span>
+                <span class="phase-tag">2-3 wks</span>
+              </div>
+              <div class="phase-goal">
+                Parity with Playwright locator API for all query patterns.
+              </div>
+              <div class="phase-detail">
+                XPath/text= selectors, .and()/.or() combinators, locator.all(), strict mode, soft
+                assertions, expect.poll()/toPass()
+              </div>
+            </div>
+
+            <div class="roadmap-phase">
+              <div class="phase-header">
+                <span class="phase-name">Phase 4 · Error Hierarchy &amp; Events</span>
+                <span class="phase-tag">1-2 wks</span>
+              </div>
+              <div class="phase-goal">
+                Production-quality error types and complete event system.
+              </div>
+              <div class="phase-detail">
+                Typed errors (TimeoutError, LocatorError etc.), wire missing events (requestfailed,
+                download, frame), removeListener(), waitForEvent()
+              </div>
+            </div>
+
+            <div class="roadmap-phase">
+              <div class="phase-header">
+                <span class="phase-name">Phase 5 · Firefox &amp; WebKit Completeness</span>
+                <span class="phase-tag">4-6 wks</span>
+              </div>
+              <div class="phase-goal">All 3 engines have comparable feature sets.</div>
+              <div class="phase-detail">
+                Implement ~75 Firefox stubs and ~80 WebKit stubs, shared WebDriver utility layer,
+                evaluate BiDi support
+              </div>
+            </div>
+
+            <div class="roadmap-phase">
+              <div class="phase-header">
+                <span class="phase-name">Phase 6 · CLI, CI/CD &amp; Configuration</span>
+                <span class="phase-tag">2-3 wks</span>
+              </div>
+              <div class="phase-goal">Production CI/CD integration.</div>
+              <div class="phase-detail">
+                CLI binary with all flags, config file (tsheet.config.ts/json), Docker image,
+                CI-specific optimizations
+              </div>
+            </div>
+
+            <div class="roadmap-phase">
+              <div class="phase-header">
+                <span class="phase-name">Phase 7 · Advanced Features</span>
+                <span class="phase-tag">6-8 wks</span>
+              </div>
+              <div class="phase-goal">Parity on advanced use cases.</div>
+              <div class="phase-detail">
+                Frame/worker support, WebSocket interception, accessibility snapshots, device
+                profiles, HAR import/export, raw CDPSession
+              </div>
+            </div>
+
+            <div class="roadmap-phase">
+              <div class="phase-header">
+                <span class="phase-name">Phase 8 · Enterprise Readiness</span>
+                <span class="phase-tag">4-6 wks</span>
+              </div>
+              <div class="phase-goal">Production-scale testing infrastructure.</div>
+              <div class="phase-detail">
+                Watch mode, UI mode / time-travel debugger, codegen, flaky detection, plugin
+                auto-discovery, cloud dashboard
+              </div>
+            </div>
+          </div>
+
+          <div class="roadmap-estimate">
+            <strong>Est. to v1.0 (Phases 0-2, 6):</strong> 10-14 weeks for a small team<br />
+            <strong>Est. to Playwright parity (all phases):</strong> 6-9 months for a small team
+          </div>
+
+          <div class="roadmap-attribution">
+            Data sourced from
+            <a href="https://github.com/achmadk/turbosheet/blob/main/PROGRESS.md">PROGRESS.md</a>
+            &mdash; last generated 2026-06-18
+          </div>
         </div>
       </div>
     </section>
