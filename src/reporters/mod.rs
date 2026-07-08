@@ -7,6 +7,25 @@ pub mod github;
 pub mod html;
 
 use serde::{Deserialize, Serialize};
+use std::time::Duration;
+
+/// Trait for reporters that process test results as they complete.
+/// Requires `Send + Sync` because reporters are passed across await points
+/// in `#[napi]` async functions.
+pub trait Reporter: Send + Sync {
+    /// Called after each individual test completes with its result.
+    fn on_test_result(&self, result: &super::test_runner::executor::TestResult);
+
+    /// Called after all tests finish with the aggregate summary.
+    fn on_complete(&self, summary: &AggregatedTestResult);
+}
+
+/// Trait for reporters that support live progress updates during test execution.
+/// Only streaming reporters (Dot, Line, List) implement this.
+pub trait ReporterWithProgress {
+    /// Called periodically during test execution to report progress.
+    fn on_progress(&self, elapsed: Duration, completed: usize, total: usize);
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReporterConfig {

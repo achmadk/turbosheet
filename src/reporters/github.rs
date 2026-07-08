@@ -1,7 +1,18 @@
-use super::{AggregatedTestResult, TestCaseResult};
+use super::{AggregatedTestResult, Reporter, TestCaseResult};
 use std::fmt::Write;
 
 pub struct GithubReporter;
+
+impl Reporter for GithubReporter {
+    fn on_test_result(&self, _result: &crate::test_runner::executor::TestResult) {
+        // GitHub reporter buffers all results, outputs on completion
+    }
+
+    fn on_complete(&self, summary: &AggregatedTestResult) {
+        let output = Self::write(summary);
+        print!("{}", output);
+    }
+}
 
 impl GithubReporter {
     pub fn write(result: &AggregatedTestResult) -> String {

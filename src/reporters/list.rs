@@ -1,6 +1,32 @@
-use super::{AggregatedTestResult, TestCaseResult};
+use super::{AggregatedTestResult, Reporter, ReporterWithProgress, TestCaseResult};
+use std::time::Duration;
 
 pub struct ListReporter;
+
+impl Reporter for ListReporter {
+    fn on_test_result(&self, result: &crate::test_runner::executor::TestResult) {
+        let tc = TestCaseResult {
+            title: result.name.clone(),
+            status: format!("{:?}", result.status).to_lowercase(),
+            duration_ms: result.duration_ms,
+            error: result.error_message.clone(),
+            retry: result.retries,
+            screenshot_paths: result.screenshot_paths.clone().unwrap_or_default(),
+            trace_data: result.trace_data.clone(),
+        };
+        print!("{}", Self::write_single(&tc));
+    }
+
+    fn on_complete(&self, summary: &AggregatedTestResult) {
+        Self::print_summary(summary);
+    }
+}
+
+impl ReporterWithProgress for ListReporter {
+    fn on_progress(&self, _elapsed: Duration, _completed: usize, _total: usize) {
+        // ListReporter outputs per-test, no additional progress needed
+    }
+}
 
 impl ListReporter {
     pub fn write(results: &[TestCaseResult]) -> String {

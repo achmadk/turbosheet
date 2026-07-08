@@ -1,12 +1,15 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tracing::{info, error, warn};
 use crate::error::TurbosheetError;
+use crate::reporters::Reporter;
 use super::config::TestConfig;
 use super::discovery::TestFile;
-use super::worker::{WorkerProcess, WorkerTestResult};
+use super::ipc::{CollectedTest, CollectedHook, CollectedSuite, ExecutionPlan, ExtractResponse, PlanResponse};
+use super::worker::WorkerProcess;
 
 use napi_derive::napi;
 
@@ -44,13 +47,13 @@ impl TestExecutor {
         }
     }
 
-    /// Execute tests and return results. If `stream_callback` is provided,
-    /// it is called with each `TestResult` as it arrives from the worker channel,
-    /// enabling real-time reporter output.
+    /// Execute tests and return results. If `reporter` is provided,
+    /// its `on_test_result` is called with each `TestResult` as it arrives,
+    /// and `on_complete` is called with the aggregate summary after all tests finish.
     pub async fn execute(
         &self,
         files: Vec<TestFile>,
-        stream_callback: Option<Box<dyn Fn(&TestResult) + Send>>,
+        reporter: Option<&dyn Reporter>,
     ) -> Result<Vec<TestResult>, TurbosheetError> {
         let workers = self.config.workers.unwrap_or(1) as usize;
         let screenshot_on_failure = self.config.screenshot_on_failure.unwrap_or(true);
@@ -78,10 +81,16 @@ impl TestExecutor {
             self.run_global_setup(setup_file).await?;
         }
 
-        let result = self.execute_tests(files, workers, screenshot_on_failure, &screenshot_dir, video_on_failure, &video_dir, stream_callback).await;
+        let result = self.execute_tests(files, workers, screenshot_on_failure, &screenshot_dir, video_on_failure, &video_dir, reporter).await;
 
         if let Some(ref teardown_file) = self.config.global_teardown {
             self.run_global_teardown(teardown_file).await;
+        }
+
+        // Notify reporter of completion with aggregate summary
+        if let (Ok(ref results), Some(reporter)) = (&result, reporter) {
+            let summary = crate::reporters::AggregatedTestResult::from_test_results(results.clone());
+            reporter.on_complete(&summary);
         }
 
         result
@@ -148,157 +157,291 @@ impl TestExecutor {
         screenshot_dir: &str,
         video_on_failure: bool,
         video_dir: &str,
-        stream_callback: Option<Box<dyn Fn(&TestResult) + Send>>,
+        reporter: Option<&dyn Reporter>,
     ) -> Result<Vec<TestResult>, TurbosheetError> {
-        let (tx, mut rx) = mpsc::channel(100);
-        let mut handles: Vec<JoinHandle<()>> = Vec::new();
-
-        let chunk_size = (files.len() + workers - 1) / workers;
-        if chunk_size == 0 {
+        if files.is_empty() {
             return Ok(Vec::new());
         }
 
         let timeout_ms = self.config.timeout.unwrap_or(30000);
         let max_retries = self.config.retries.unwrap_or(0);
 
+        // ── Phase 1: Extract test definitions from all files ──────────────
+        info!("Extracting test definitions from {} files ({} workers)", files.len(), workers);
+        let extract_responses = self.extract_all_files(&files, workers, timeout_ms).await?;
+
+        if extract_responses.is_empty() {
+            info!("No test definitions extracted — skipping execution");
+            return Ok(Vec::new());
+        }
+
+        // ── Phase 2: Build execution plans via PlanBuilder ────────────────
+        let mut plan_builder = PlanBuilder::new(timeout_ms, max_retries);
+        for response in extract_responses {
+            plan_builder.add_extracted_file(response);
+        }
+        let all_plans = plan_builder.build();
+        let total_plans = all_plans.len();
+        info!("Built {} execution plans from extracted definitions", total_plans);
+
+        if total_plans == 0 {
+            return Ok(Vec::new());
+        }
+
+        // ── Phase 3: Execute plans ────────────────────────────────────────
+        self.execute_plans(
+            all_plans,
+            workers,
+            screenshot_on_failure,
+            screenshot_dir,
+            video_on_failure,
+            video_dir,
+            reporter,
+            max_retries,
+        ).await
+    }
+
+    /// Phase 1: Spawn workers, extract test definitions from each file,
+    /// return collected `ExtractResponse`s.
+    async fn extract_all_files(
+        &self,
+        files: &[TestFile],
+        workers: usize,
+        timeout_ms: u32,
+    ) -> Result<Vec<ExtractResponse>, TurbosheetError> {
+        let file_count = files.len();
+        let chunk_size = (file_count + workers - 1) / workers;
+        let mut all_responses = Vec::with_capacity(file_count);
+
+        // Collect responses sequentially by chunks; parallel extraction
+        // is handled inside each chunk via the worker pool
+        let mut chunk_buffers: Vec<Vec<ExtractResponse>> = Vec::new();
+
+        // Extract in parallel chunks using one worker per chunk
+        let mut handles = Vec::new();
         for chunk in files.chunks(chunk_size) {
+            let chunk: Vec<TestFile> = chunk.to_vec();
+            let timeout_ms = timeout_ms;
+
+            let handle = tokio::spawn(async move {
+                let mut responses = Vec::with_capacity(chunk.len());
+                let mut worker = match WorkerProcess::spawn().await {
+                    Ok(w) => w,
+                    Err(e) => {
+                        error!("Failed to spawn extract worker: {}", e);
+                        return responses;
+                    }
+                };
+
+                for file in &chunk {
+                    let file_path = file.path.to_string_lossy().to_string();
+                    match worker.extract_tests(&file_path, timeout_ms).await {
+                        Ok(response) => {
+                            let count = response.tests.len();
+                            info!("Extracted {} tests from {}", count, file_path);
+                            responses.push(response);
+                        }
+                        Err(e) => {
+                            error!("Failed to extract tests from {}: {}", file_path, e);
+                            // Push an empty response so we still register the file
+                            responses.push(ExtractResponse {
+                                tests: Vec::new(),
+                                hooks: Vec::new(),
+                                suites: Vec::new(),
+                            });
+                        }
+                    }
+                }
+
+                // Clean up worker
+                let _ = worker.shutdown().await;
+                responses
+            });
+
+            handles.push(handle);
+        }
+
+        for handle in handles {
+            let chunk_responses = handle.await.unwrap_or_default();
+            chunk_buffers.push(chunk_responses);
+        }
+
+        for mut buf in chunk_buffers {
+            all_responses.append(&mut buf);
+        }
+
+        Ok(all_responses)
+    }
+
+    /// Phase 3: Execute a list of `ExecutionPlan`s using workers.
+    /// Each plan is run independently with retry support.
+    /// Tracks suite-level beforeAll failures to cascade skips
+    /// to subsequent tests in the same suite.
+    async fn execute_plans(
+        &self,
+        plans: Vec<ExecutionPlan>,
+        workers: usize,
+        screenshot_on_failure: bool,
+        screenshot_dir: &str,
+        video_on_failure: bool,
+        video_dir: &str,
+        reporter: Option<&dyn Reporter>,
+        max_retries: u32,
+    ) -> Result<Vec<TestResult>, TurbosheetError> {
+        let plan_count = plans.len();
+        let chunk_size = (plan_count + workers - 1) / workers;
+        let (tx, mut rx) = mpsc::channel(100);
+        let mut handles: Vec<JoinHandle<()>> = Vec::new();
+
+        // Shared state for suite-level beforeAll failure cascading.
+        // Contains suite_paths whose beforeAll has failed.
+        let blocked_suites = Arc::new(tokio::sync::Mutex::new(
+            std::collections::HashSet::<Vec<String>>::new(),
+        ));
+
+        for chunk in plans.into_iter().collect::<Vec<_>>().chunks(chunk_size) {
             let chunk = chunk.to_vec();
             let tx = tx.clone();
-            let timeout_ms = timeout_ms;
-            let max_retries = max_retries;
             let screenshot_on_failure = screenshot_on_failure;
             let _screenshot_dir = screenshot_dir.to_string();
             let video_on_failure = video_on_failure;
             let video_dir = video_dir.to_string();
+            let max_retries = max_retries;
+            let blocked_suites = Arc::clone(&blocked_suites);
 
             let handle = tokio::spawn(async move {
-                // Each worker task spawns its own Node.js worker process
                 let mut worker = match WorkerProcess::spawn().await {
                     Ok(w) => w,
                     Err(e) => {
-                        error!("Failed to spawn worker: {}. Falling back to stub results.", e);
-                        // Fallback: produce stub results if worker can't be spawned
-                        for file in chunk {
-                            let start_time = Instant::now();
-                            let file_name = file.path.file_name()
-                                .map(|n| n.to_string_lossy().to_string())
-                                .unwrap_or_else(|| "unknown".to_string());
-
-                            let test_name = file_name.replace(".tsheet.ts", "")
-                                .replace(".spec.ts", "")
-                                .replace('_', " ")
-                                .replace('-', " ");
-
+                        error!("Failed to spawn execution worker: {}", e);
+                        for plan in chunk {
                             let result = TestResult {
-                                file: file.path.to_string_lossy().to_string(),
-                                name: test_name,
+                                file: plan.file_path.clone(),
+                                name: plan.test_name.clone(),
                                 status: TestStatus::Failed,
-                                error_message: Some(format!("Worker process unavailable: {}", e)),
-                                duration_ms: start_time.elapsed().as_millis() as u32,
+                                error_message: Some(format!("Worker unavailable: {}", e)),
+                                duration_ms: 0,
                                 retries: 0,
                                 screenshot_paths: None,
                                 trace_data: None,
                                 video_paths: None,
                             };
-
-                            if let Err(send_err) = tx.send(result).await {
-                                error!("Failed to send test result: {}", send_err);
-                            }
+                            let _ = tx.send(result).await;
                         }
                         return;
                     }
                 };
 
-                for file in chunk {
-                    let file_path = file.path.to_string_lossy().to_string();
+                for plan in chunk {
+                    // Check if this plan's suite is blocked by a beforeAll failure
+                    {
+                        let blocked = blocked_suites.lock().await;
+
+                        // Walk the suite path ancestry — any ancestor suite being
+                        // blocked means this test is also blocked
+                        let is_ancestor_blocked = (0..=plan.suite_path.len()).any(|len| {
+                            let prefix: Vec<String> = plan.suite_path[..len].to_vec();
+                            blocked.contains(&prefix)
+                        });
+
+                        if is_ancestor_blocked {
+                            let result = TestResult {
+                                file: plan.file_path.clone(),
+                                name: plan.test_name.clone(),
+                                status: TestStatus::Skipped,
+                                error_message: Some(
+                                    "Skipped: beforeAll failed in parent suite".to_string(),
+                                ),
+                                duration_ms: 0,
+                                retries: 0,
+                                screenshot_paths: None,
+                                trace_data: None,
+                                video_paths: None,
+                            };
+                            let _ = tx.send(result).await;
+                            continue;
+                        }
+                    }
+
                     let mut attempt = 0;
-                    let mut last_results: Vec<WorkerTestResult> = Vec::new();
 
                     loop {
-                        match worker.execute_test(&file_path, timeout_ms, Some(video_on_failure), Some(&video_dir)).await {
-                            Ok(worker_results) => {
-                                last_results = worker_results;
+                        match worker.run_plan(
+                            plan.clone(),
+                            Some(video_on_failure),
+                            Some(&video_dir),
+                        ).await {
+                            Ok(plan_response) => {
+                                let has_failure = plan_response.status == "failed"
+                                    || plan_response.status == "timeout";
 
-                                // Check if any tests failed and we have retries left
-                                let has_failures = last_results.iter().any(|r| {
-                                    r.status == "failed" || r.status == "timeout"
-                                });
-
-                                if has_failures && attempt < max_retries {
+                                if has_failure && attempt < max_retries {
                                     attempt += 1;
-                                    info!("Retrying file {} (attempt {}/{})", file_path, attempt + 1, max_retries + 1);
+                                    info!(
+                                        "Retrying plan '{}' ({}/{})",
+                                        plan.test_name,
+                                        attempt + 1,
+                                        max_retries + 1,
+                                    );
                                     continue;
                                 }
 
-                                // Convert worker results to TestResult
-                                for wr in &last_results {
-                                    let status = match wr.status.as_str() {
-                                        "passed" => TestStatus::Passed,
-                                        "failed" => TestStatus::Failed,
-                                        "skipped" => TestStatus::Skipped,
-                                        "timeout" => TestStatus::Timeout,
-                                        _ => TestStatus::Failed,
-                                    };
-
-                                    let screenshot_paths = if screenshot_on_failure
-                                        && matches!(status, TestStatus::Failed | TestStatus::Timeout)
-                                    {
-                                        // TODO: capture screenshot via CDP when page is available
-                                        None
-                                    } else {
-                                        None
-                                    };
-
-                                    let video_paths = if video_on_failure
-                                        && matches!(status, TestStatus::Failed | TestStatus::Timeout)
-                                    {
-                                        wr.video_paths.clone()
-                                    } else if !video_on_failure {
-                                        // If video is always on, still capture paths
-                                        wr.video_paths.clone()
-                                    } else {
-                                        None
-                                    };
-
-                                    let result = TestResult {
-                                        file: file_path.clone(),
-                                        name: wr.name.clone(),
-                                        status,
-                                        error_message: wr.error.clone(),
-                                        duration_ms: wr.duration_ms,
-                                        retries: attempt,
-                                        screenshot_paths,
-                                        trace_data: wr.trace_data.clone(),
-                                        video_paths,
-                                    };
-
-                                    if let Err(e) = tx.send(result).await {
-                                        error!("Failed to send test result: {}", e);
-                                    }
+                                // If this test had run_before_all and failed,
+                                // block the suite so remaining tests are skipped
+                                if has_failure && plan.run_before_all {
+                                    blocked_suites.lock().await.insert(plan.suite_path.clone());
                                 }
+
+                                let status = match plan_response.status.as_str() {
+                                    "passed" => TestStatus::Passed,
+                                    "failed" => TestStatus::Failed,
+                                    "skipped" => TestStatus::Skipped,
+                                    "timeout" => TestStatus::Timeout,
+                                    _ => TestStatus::Failed,
+                                };
+
+                                let should_screenshot = screenshot_on_failure
+                                    && matches!(status, TestStatus::Failed | TestStatus::Timeout);
+
+                                let result = TestResult {
+                                    file: plan.file_path.clone(),
+                                    name: plan.test_name.clone(),
+                                    status,
+                                    error_message: plan_response.error,
+                                    duration_ms: plan_response.duration_ms,
+                                    retries: attempt,
+                                    screenshot_paths: if should_screenshot {
+                                        None // TODO: capture screenshot via CDP
+                                    } else {
+                                        None
+                                    },
+                                    trace_data: None,
+                                    video_paths: None,
+                                };
+
+                                let _ = tx.send(result).await;
                                 break;
                             }
                             Err(e) => {
-                                error!("Worker execution failed for {}: {}", file_path, e);
-                                let file_name = file.path.file_name()
-                                    .map(|n| n.to_string_lossy().to_string())
-                                    .unwrap_or_else(|| "unknown".to_string());
+                                error!("Plan execution failed for '{}': {}", plan.test_name, e);
+
+                                // Worker error also blocks the suite if beforeAll was involved
+                                if plan.run_before_all {
+                                    blocked_suites.lock().await.insert(plan.suite_path.clone());
+                                }
 
                                 let result = TestResult {
-                                    file: file_path.clone(),
-                                    name: file_name,
+                                    file: plan.file_path.clone(),
+                                    name: plan.test_name.clone(),
                                     status: TestStatus::Failed,
-                                    error_message: Some(format!("Worker error: {}", e)),
+                                    error_message: Some(format!("Execution error: {}", e)),
                                     duration_ms: 0,
                                     retries: attempt,
                                     screenshot_paths: None,
                                     trace_data: None,
                                     video_paths: None,
                                 };
-
-                                if let Err(send_err) = tx.send(result).await {
-                                    error!("Failed to send test result: {}", send_err);
-                                }
+                                let _ = tx.send(result).await;
                                 break;
                             }
                         }
@@ -307,7 +450,7 @@ impl TestExecutor {
 
                 // Gracefully shut down the worker
                 if let Err(e) = worker.shutdown().await {
-                    warn!("Failed to gracefully shutdown worker: {}", e);
+                    warn!("Failed to gracefully shutdown execution worker: {}", e);
                     let _ = worker.kill().await;
                 }
             });
@@ -318,9 +461,9 @@ impl TestExecutor {
         drop(tx);
 
         let mut results = Vec::new();
-        while let Some(mut result) = rx.recv().await {
-            if let Some(ref callback) = stream_callback {
-                callback(&result);
+        while let Some(result) = rx.recv().await {
+            if let Some(reporter) = reporter {
+                reporter.on_test_result(&result);
             }
             results.push(result);
         }
@@ -329,7 +472,7 @@ impl TestExecutor {
             let _ = handle.await;
         }
 
-        info!("Completed execution of {} tests", results.len());
+        info!("Completed execution of {} test plans", results.len());
         Ok(results)
     }
 
@@ -385,4 +528,210 @@ impl TestExecutor {
 
         Ok(all_results)
     }
+}
+
+// ── PlanBuilder ────────────────────────────────────────────────────────
+
+/// Builds per-test `ExecutionPlan`s from extracted test definitions.
+///
+/// 1. Accumulates `ExtractResponse` data from multiple files.
+/// 2. On `build()`: applies modifier cascade, resolves hook inheritance,
+///    determines beforeAll/afterAll scheduling, and produces flat plan list.
+pub struct PlanBuilder {
+    tests: Vec<CollectedTest>,
+    hooks: Vec<CollectedHook>,
+    suites: Vec<CollectedSuite>,
+    /// Default timeout for tests that don't specify one
+    default_timeout_ms: u32,
+    /// Maximum retries per test
+    max_retries: u32,
+}
+
+impl PlanBuilder {
+    pub fn new(default_timeout_ms: u32, max_retries: u32) -> Self {
+        Self {
+            tests: Vec::new(),
+            hooks: Vec::new(),
+            suites: Vec::new(),
+            default_timeout_ms,
+            max_retries,
+        }
+    }
+
+    /// Add extracted test definitions from a single file.
+    pub fn add_extracted_file(&mut self, response: ExtractResponse) {
+        self.tests.extend(response.tests);
+        self.hooks.extend(response.hooks);
+        self.suites.extend(response.suites);
+    }
+
+    /// Consume the builder and produce a list of execution plans.
+    pub fn build(mut self) -> Vec<ExecutionPlan> {
+        if self.tests.is_empty() {
+            return Vec::new();
+        }
+
+        // Step 1: Remove skipped tests
+        self.tests.retain(|t| t.modifier != "skip");
+
+        // Step 2: Check for "only" focus
+        let has_only_test = self.tests.iter().any(|t| t.modifier == "only");
+        let has_only_suite = self.suites.iter().any(|s| s.suite_type == "only");
+
+        if has_only_test || has_only_suite {
+            let only_suite_paths: Vec<Vec<String>> = self.suites.iter()
+                .filter(|s| s.suite_type == "only")
+                .map(|s| s.suite_path.clone())
+                .collect();
+
+            self.tests.retain(|t| {
+                if t.modifier == "only" {
+                    return true;
+                }
+                // Check if test belongs to an "only" suite
+                only_suite_paths.iter().any(|sp| {
+                    sp.len() <= t.suite_path.len()
+                        && sp.iter().zip(t.suite_path.iter()).all(|(a, b)| a == b)
+                })
+            });
+        }
+
+        // Step 3: Remove tests in "skip" suites
+        let skip_suite_paths: Vec<Vec<String>> = self.suites.iter()
+            .filter(|s| s.suite_type == "skip")
+            .map(|s| s.suite_path.clone())
+            .collect();
+
+        if !skip_suite_paths.is_empty() {
+            self.tests.retain(|t| {
+                !skip_suite_paths.iter().any(|sp| {
+                    sp.len() <= t.suite_path.len()
+                        && sp.iter().zip(t.suite_path.iter()).all(|(a, b)| a == b)
+                })
+            });
+        }
+
+        // Step 4: Determine suite membership for scheduling
+        // Group tests by their suite path to find first/last test per suite
+        let mut suite_test_indices: HashMap<Vec<String>, Vec<usize>> = HashMap::new();
+        for (i, test) in self.tests.iter().enumerate() {
+            suite_test_indices
+                .entry(test.suite_path.clone())
+                .or_default()
+                .push(i);
+        }
+
+        // Step 5: Build per-test execution plans with resolved hooks
+        let mut plans = Vec::with_capacity(self.tests.len());
+        let timeout_ms = self.default_timeout_ms;
+
+        for (i, test) in self.tests.iter().enumerate() {
+            let suite_path = &test.suite_path;
+
+            // Resolve hook inheritance by walking suite path ancestry
+            let before_all = self.resolve_hooks_for_path("beforeAll", suite_path);
+            let after_all = self.resolve_hooks_for_path("afterAll", suite_path);
+            let before_each = self.resolve_before_each(suite_path);
+            let after_each = self.resolve_after_each(suite_path);
+
+            // Determine beforeAll scheduling: first test in this suite path
+            let run_before_all = suite_test_indices
+                .get(suite_path)
+                .map(|indices| indices.first() == Some(&i))
+                .unwrap_or(false);
+
+            // Determine afterAll scheduling: last test in this suite path
+            let run_after_all = suite_test_indices
+                .get(suite_path)
+                .map(|indices| indices.last() == Some(&i))
+                .unwrap_or(false);
+
+            // Apply test.slow: triple timeout
+            let test_timeout = if test.modifier == "slow" {
+                timeout_ms * 3
+            } else {
+                timeout_ms
+            };
+
+            plans.push(ExecutionPlan {
+                test_name: test.name.clone(),
+                suite_path: suite_path.clone(),
+                file_path: String::new(), // Set by caller
+                test_fn_body: test.fn_body.clone(),
+                before_all_hooks: before_all,
+                after_all_hooks: after_all,
+                before_each_hooks: before_each,
+                after_each_hooks: after_each,
+                timeout_ms: test_timeout,
+                is_fail: test.modifier == "fail",
+                is_fixme: test.modifier == "fixme",
+                is_slow: test.modifier == "slow",
+                run_before_all,
+                run_after_all,
+            });
+        }
+
+        plans
+    }
+
+    /// Find all hooks of a given type whose suite_path is an ancestor of
+    /// or equal to the test's suite_path. Parent-first order.
+    fn resolve_hooks_for_path(
+        &self,
+        hook_type: &str,
+        test_path: &[String],
+    ) -> Vec<String> {
+        let mut matching: Vec<(&CollectedHook, usize)> = self.hooks
+            .iter()
+            .filter(|h| h.hook_type == hook_type)
+            .filter(|h| is_path_ancestor_or_self(&h.suite_path, test_path))
+            .map(|h| (h, h.suite_path.len()))
+            .collect();
+
+        // Sort by path depth: shallow (parent) first for beforeAll, deep (child) first for afterAll
+        matching.sort_by_key(|(_, depth)| *depth);
+
+        matching.into_iter().map(|(h, _)| h.fn_body.clone()).collect()
+    }
+
+    /// Resolve beforeEach hooks parent-first (ancestor → child order)
+    fn resolve_before_each(&self, test_path: &[String]) -> Vec<String> {
+        let mut matching: Vec<(&CollectedHook, usize)> = self.hooks
+            .iter()
+            .filter(|h| h.hook_type == "beforeEach")
+            .filter(|h| is_path_ancestor_or_self(&h.suite_path, test_path))
+            .map(|h| (h, h.suite_path.len()))
+            .collect();
+
+        matching.sort_by_key(|(_, depth)| *depth); // parent first
+        matching.into_iter().map(|(h, _)| h.fn_body.clone()).collect()
+    }
+
+    /// Resolve afterEach hooks child-first (reverse depth order)
+    fn resolve_after_each(&self, test_path: &[String]) -> Vec<String> {
+        let mut matching: Vec<(&CollectedHook, usize)> = self.hooks
+            .iter()
+            .filter(|h| h.hook_type == "afterEach")
+            .filter(|h| is_path_ancestor_or_self(&h.suite_path, test_path))
+            .map(|h| (h, h.suite_path.len()))
+            .collect();
+
+        matching.sort_by_key(|(_, depth)| std::cmp::Reverse(*depth)); // child first
+        matching.into_iter().map(|(h, _)| h.fn_body.clone()).collect()
+    }
+}
+
+/// Returns true if `ancestor_path` is equal to or a prefix of `test_path`.
+/// Empty ancestor_path (root-level hooks) applies to all tests.
+fn is_path_ancestor_or_self(ancestor_path: &[String], test_path: &[String]) -> bool {
+    if ancestor_path.is_empty() {
+        return true;
+    }
+    if ancestor_path.len() > test_path.len() {
+        return false;
+    }
+    ancestor_path
+        .iter()
+        .zip(test_path.iter())
+        .all(|(a, b)| a == b)
 }

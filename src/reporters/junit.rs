@@ -1,7 +1,18 @@
-use super::{AggregatedTestResult, TestSuiteResult, TestCaseResult};
+use super::{AggregatedTestResult, Reporter, TestSuiteResult, TestCaseResult};
 use std::fmt::Write;
 
 pub struct JunitReporter;
+
+impl Reporter for JunitReporter {
+    fn on_test_result(&self, _result: &crate::test_runner::executor::TestResult) {
+        // JUnit reporter buffers all results, outputs on completion
+    }
+
+    fn on_complete(&self, summary: &AggregatedTestResult) {
+        let xml = Self::write(summary);
+        println!("{}", xml);
+    }
+}
 
 impl JunitReporter {
     pub fn write(result: &AggregatedTestResult) -> String {

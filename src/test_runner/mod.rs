@@ -12,7 +12,7 @@ pub mod worker;
 use std::sync::{Mutex, OnceLock};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use crate::reporters::{AggregatedTestResult, parse_reporters, ReporterType};
+use crate::reporters::{AggregatedTestResult, Reporter, parse_reporters, ReporterType};
 use self::registry::{TestRegistry, TestModifier, SuiteType};
 
 static REGISTRY: OnceLock<Mutex<TestRegistry>> = OnceLock::new();
@@ -56,76 +56,35 @@ pub async fn run_tests(config: config::TestConfig) -> Result<Vec<executor::TestR
 
     let executor = executor::TestExecutor::new(config.clone());
 
-    // Build streaming callback for real-time reporter output
-    let stream_callback: Option<Box<dyn Fn(&executor::TestResult) + Send>> = config.reporter.as_ref().map(|reporter_str| {
+    // Build reporter from CLI config
+    let reporter: Option<Box<dyn Reporter>> = config.reporter.as_ref().map(|reporter_str| {
         let reporter_types = parse_reporters(reporter_str);
-        Box::new(move |result: &executor::TestResult| {
-            let tc = crate::reporters::TestCaseResult {
-                title: result.name.clone(),
-                status: format!("{:?}", result.status).to_lowercase(),
-                duration_ms: result.duration_ms,
-                error: result.error_message.clone(),
-                retry: result.retries,
-                screenshot_paths: result.screenshot_paths.clone().unwrap_or_default(),
-                trace_data: result.trace_data.clone(),
-            };
-            for rt in &reporter_types {
-                match rt {
-                    crate::reporters::ReporterType::Dot => {
-                        let output = crate::reporters::dot::DotReporter::write_single(&tc);
-                        print!("{}", output);
-                    },
-                    crate::reporters::ReporterType::Line => {
-                        let output = crate::reporters::line::LineReporter::write_single(&tc);
-                        print!("{}", output);
-                    },
-                    crate::reporters::ReporterType::List => {
-                        let output = crate::reporters::list::ListReporter::write_single(&tc);
-                        print!("{}", output);
-                    },
-                    _ => {}, // Final-report reporters handled after all results
-                }
-            }
-        })
+        // For a single reporter type, return that reporter directly.
+        // For multiple reporters, we compose them. Currently only single reporter is used.
+        let reporter_type = reporter_types.first().copied().unwrap_or(ReporterType::List);
+        match reporter_type {
+            ReporterType::Dot => Box::new(crate::reporters::dot::DotReporter) as Box<dyn Reporter>,
+            ReporterType::Line => Box::new(crate::reporters::line::LineReporter) as Box<dyn Reporter>,
+            ReporterType::List => Box::new(crate::reporters::list::ListReporter) as Box<dyn Reporter>,
+            ReporterType::Json => Box::new(crate::reporters::json::JsonReporter) as Box<dyn Reporter>,
+            ReporterType::Junit => Box::new(crate::reporters::junit::JunitReporter) as Box<dyn Reporter>,
+            ReporterType::Html => Box::new(crate::reporters::html::HtmlReporter) as Box<dyn Reporter>,
+            ReporterType::Github => Box::new(crate::reporters::github::GithubReporter) as Box<dyn Reporter>,
+        }
     });
 
-    let results = executor.execute(files, stream_callback).await?;
+    let results = executor.execute(files, reporter.as_deref()).await?;
 
+    // Handle HTML and JUnit file output (beyond stdout from on_complete)
     if let Some(ref reporter_str) = config.reporter {
         let reporter_types = parse_reporters(reporter_str);
         let aggregated = AggregatedTestResult::from_test_results(results.clone());
 
         for reporter_type in reporter_types {
             match reporter_type {
-                ReporterType::Dot => {
-                    use crate::reporters::dot::DotReporter;
-                    let output = DotReporter::write(&aggregated.tests);
-                    print!("{}", output);
-                    let _ = DotReporter::print_summary(&aggregated);
-                },
-                ReporterType::Line => {
-                    use crate::reporters::line::LineReporter;
-                    let output = LineReporter::write(&aggregated.tests);
-                    println!("{}", output);
-                    let _ = LineReporter::print_summary(&aggregated);
-                },
-                ReporterType::List => {
-                    use crate::reporters::list::ListReporter;
-                    let output = ListReporter::write(&aggregated.tests);
-                    print!("{}", output);
-                    let _ = ListReporter::print_summary(&aggregated);
-                },
-                ReporterType::Json => {
-                    use crate::reporters::json::JsonReporter;
-                    let _ = JsonReporter::write_to_stdout(&aggregated);
-                },
-                ReporterType::Github => {
-                    use crate::reporters::github::GithubReporter;
-                    let _ = GithubReporter::print_to_stdout(&aggregated);
-                },
                 ReporterType::Html => {
-                    use crate::reporters::html::{HtmlReporter, write_to_file};
-                    let html = HtmlReporter::write(&aggregated);
+                    use crate::reporters::html::write_to_file;
+                    let html = crate::reporters::html::HtmlReporter::write(&aggregated);
                     let html_output_path = config.output_dir.clone().map(|d| format!("{}/report.html", d)).unwrap_or_else(|| "test-results/report.html".to_string());
                     if let Err(e) = write_to_file(&html, &html_output_path) {
                         eprintln!("Warning: Failed to write HTML report: {}", e);
@@ -134,9 +93,8 @@ pub async fn run_tests(config: config::TestConfig) -> Result<Vec<executor::TestR
                     }
                 },
                 ReporterType::Junit => {
-                    use crate::reporters::junit::JunitReporter;
                     use crate::reporters::html::write_to_file;
-                    let junit_xml = JunitReporter::write(&aggregated);
+                    let junit_xml = crate::reporters::junit::JunitReporter::write(&aggregated);
                     match config.output_dir.clone() {
                         Some(dir) => {
                             let junit_path = format!("{}/results.xml", dir);
@@ -151,6 +109,7 @@ pub async fn run_tests(config: config::TestConfig) -> Result<Vec<executor::TestR
                         }
                     }
                 },
+                _ => {} // All other reporters handled via trait on_test_result/on_complete
             }
         }
     }

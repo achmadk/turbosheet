@@ -1,7 +1,33 @@
-use super::{AggregatedTestResult, TestCaseResult};
+use super::{AggregatedTestResult, Reporter, ReporterWithProgress, TestCaseResult};
 use std::fmt::Write;
+use std::time::Duration;
 
 pub struct LineReporter;
+
+impl Reporter for LineReporter {
+    fn on_test_result(&self, result: &crate::test_runner::executor::TestResult) {
+        let tc = TestCaseResult {
+            title: result.name.clone(),
+            status: format!("{:?}", result.status).to_lowercase(),
+            duration_ms: result.duration_ms,
+            error: result.error_message.clone(),
+            retry: result.retries,
+            screenshot_paths: result.screenshot_paths.clone().unwrap_or_default(),
+            trace_data: result.trace_data.clone(),
+        };
+        print!("{}", Self::write_single(&tc));
+    }
+
+    fn on_complete(&self, summary: &AggregatedTestResult) {
+        Self::print_summary(summary);
+    }
+}
+
+impl ReporterWithProgress for LineReporter {
+    fn on_progress(&self, _elapsed: Duration, _completed: usize, _total: usize) {
+        // LineReporter outputs per-test, no additional progress needed
+    }
+}
 
 impl LineReporter {
     pub fn write(results: &[TestCaseResult]) -> String {

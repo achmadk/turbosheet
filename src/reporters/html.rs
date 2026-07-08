@@ -1,7 +1,18 @@
-use super::{AggregatedTestResult, TestSuiteResult, TestCaseResult};
+use super::{AggregatedTestResult, Reporter, TestSuiteResult, TestCaseResult};
 use std::fmt::Write;
 
 pub struct HtmlReporter;
+
+impl Reporter for HtmlReporter {
+    fn on_test_result(&self, _result: &crate::test_runner::executor::TestResult) {
+        // HTML reporter buffers all results, outputs on completion
+    }
+
+    fn on_complete(&self, summary: &AggregatedTestResult) {
+        let html = Self::write(summary);
+        println!("{}", html);
+    }
+}
 
 impl HtmlReporter {
     pub fn write(result: &AggregatedTestResult) -> String {

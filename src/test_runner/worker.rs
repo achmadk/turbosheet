@@ -2,7 +2,7 @@ use std::process::Stdio;
 use tokio::process::{Child, Command};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use crate::error::TurbosheetError;
-use super::ipc::{JsonRpcRequest, JsonRpcResponse};
+use super::ipc::{JsonRpcRequest, JsonRpcResponse, ExtractResponse, ExecutionPlan, PlanResponse};
 
 pub struct WorkerProcess {
     process: Child,
@@ -222,6 +222,88 @@ impl WorkerProcess {
         }
     }
 
+    /// Phase 1: Extract test definitions from a file (no browser in worker).
+    /// Sends `extractTests` JSON-RPC and returns parsed `ExtractResponse`.
+    pub async fn extract_tests(
+        &mut self,
+        file_path: &str,
+        timeout_ms: u32,
+    ) -> Result<ExtractResponse, TurbosheetError> {
+        let req = JsonRpcRequest::new(
+            "extractTests",
+            serde_json::json!({
+                "filePath": file_path,
+                "timeout": timeout_ms,
+            }),
+        );
+
+        let response = self.send_request(req).await?;
+
+        if let Some(error) = response.error {
+            return Err(TurbosheetError::Other(format!(
+                "Worker extraction error: {}",
+                error.message
+            )));
+        }
+
+        if let Some(result) = response.result {
+            let extract_response: ExtractResponse =
+                serde_json::from_value(result).map_err(|e| {
+                    TurbosheetError::Other(format!(
+                        "Failed to parse extract response: {}",
+                        e
+                    ))
+                })?;
+            Ok(extract_response)
+        } else {
+            Err(TurbosheetError::Other(
+                "Worker returned no result for extractTests".to_string(),
+            ))
+        }
+    }
+
+    /// Phase 2: Execute a single test plan (with browser).
+    /// Sends `runPlan` JSON-RPC and returns parsed `PlanResponse`.
+    pub async fn run_plan(
+        &mut self,
+        plan: ExecutionPlan,
+        video_on_failure: Option<bool>,
+        video_dir: Option<&str>,
+    ) -> Result<PlanResponse, TurbosheetError> {
+        let req = JsonRpcRequest::new(
+            "runPlan",
+            serde_json::json!({
+                "plan": plan,
+                "videoOnFailure": video_on_failure,
+                "videoDir": video_dir,
+            }),
+        );
+
+        let response = self.send_request(req).await?;
+
+        if let Some(error) = response.error {
+            return Err(TurbosheetError::Other(format!(
+                "Worker plan execution error: {}",
+                error.message
+            )));
+        }
+
+        if let Some(result) = response.result {
+            let plan_response: PlanResponse =
+                serde_json::from_value(result).map_err(|e| {
+                    TurbosheetError::Other(format!(
+                        "Failed to parse plan response: {}",
+                        e
+                    ))
+                })?;
+            Ok(plan_response)
+        } else {
+            Err(TurbosheetError::Other(
+                "Worker returned no result for runPlan".to_string(),
+            ))
+        }
+    }
+
     /// Gracefully shut down the worker.
     pub async fn shutdown(&mut self) -> Result<(), TurbosheetError> {
         let req = JsonRpcRequest::new("shutdown", serde_json::json!({}));
@@ -264,7 +346,7 @@ mod tests {
 
     #[test]
     fn test_trace_data_round_trip_through_worker_result() {
-        let trace_json = r#"{"events":[{"type":"action","action_type":"click","selector":"#btn","timestamp_ms":1000,"duration_ms":50,"result":"success"}],"metadata":{"test_name":"test-file"}}"#;
+        let trace_json = r##"{"events":[{"type":"action","action_type":"click","selector":"#btn","timestamp_ms":1000,"duration_ms":50,"result":"success"}],"metadata":{"test_name":"test-file"}}"##;
 
         let json = serde_json::json!({
             "name": "my test",
